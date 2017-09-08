@@ -29,7 +29,7 @@ var inputText = null;
 var outputText = null;
 var regexTest = null;
 var conversationId = null;
-var excelGenerationRecordCountLimit = 500;
+var excelGenerationRecordCountLimit = 10;
 var app = express();
 //var sleep = require('sleep');
 var striptags = require('striptags');
@@ -855,18 +855,7 @@ app.post('/api/message', function (req, res) {
 });
 
 
-function connectDb() {
-	mysql_pool.getConnection(function (err, connection) {
-		if (err) {
-			connection.release();
-			console.log(' Error getting mysql_pool connection: ' + err);
-			throw err;
-		} else {
-			console.log('Connection Established .... ');
-		}
 
-	});
-}
 
 function executeQuerySync(sql) {
 
@@ -940,8 +929,6 @@ function orchestrateBotResponseTextForSiteName(dbQueryResult, outputText, respon
 	return outputText;
 }
 
-
-
 function showParentIncidentDetails(dbQueryResult, outputText, data) {
 	var outputText_new = '';
 	outputText_new = "Please see details below for Master incident " + dbQueryResult[0].incident_number + ".<br/><br/>";
@@ -972,7 +959,8 @@ function showChildIncidents(dbQueryResult, outputText, data, conversationId) {
 	var excelFileName = "childIncidentList_" + conversationId + "_" + new Date().getTime() + ".xlsx";
 	if (dbQueryResult.length > excelGenerationRecordCountLimit) {
 		//outputText_new ="Please see details below for 10 child incidents only. <br/>";
-		outputText_new += "Please see details for incidents in excel sheet. <a href='./" + excelFileName + "' target='_blank'>Download Excel</a><br/>";
+		outputText_new += "Please see details for incidents in excel sheet.<br/>";
+		outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
 		buildExcelSheet(excelFileName, dbQueryResult, 4);
 	} else {
 		outputText_new = "Please see details below for <b>" + dbQueryResult.length + "</b> child incidents only. <br/>";
@@ -1133,7 +1121,8 @@ function showIncidentsForSiteName(dbQueryResult, outputText, data, conversationI
 	outputText_new = "There are total <b>" + dbQueryResult.length + "</b> incidents. ";
 	if (dbQueryResult.length > excelGenerationRecordCountLimit) {
 		//outputText_new +="Please see details below for 10 incidents only. <br/>";
-		outputText_new += "Please see details for incidents in excel sheet. <a href='./" + excelFileName + "' target='_blank'>Download Excel</a><br/>";
+		outputText_new += "Please see details for incidents in excel sheet.<br/>";
+		outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
 		buildExcelSheet(excelFileName, dbQueryResult, 4);
 	} else {
 		outputText_new += "Please see details. <br/>";
@@ -1167,7 +1156,8 @@ function DisplyDetailsForMasterIncidents(dbQueryResult, outputText, data, conver
 
 		if (dbQueryResult.length > 0 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 			//outputText_new +="Please see details below for 10 incidents only. <br/>";
-			outputText_new += "Please see details for incidents in excel sheet. <a href='./" + excelFileName + "' target='_blank'>Download Excel</a><br/>";
+			outputText_new += "Please see details for incidents in excel sheet.<br/>";
+			outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
 			buildExcelSheet(excelFileName, dbQueryResult, 4);
 		} else {
 			outputText_new += "Displaying <b>" + dbQueryResult.length + "</b> master incidents.<br/>";
@@ -1201,7 +1191,8 @@ function showMasterIncidentsForRegion(dbQueryResult, outputText, data, conversat
 
 		if (dbQueryResult.length > 0 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 			//outputText_new +="Please see details below for 10 incidents only. <br/>";
-			outputText_new += "Please see details for incidents in excel sheet. <a href='./" + excelFileName + "' target='_blank'>Download Excel</a><br/>";
+			outputText_new += "Please see details for incidents in excel sheet.<br/>";
+			outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
 			buildExcelSheet(excelFileName, dbQueryResult, 4);
 		} else {
 			outputText_new += "Displaying <b>" + dbQueryResult.length + "</b> master incidents that have child association. <br/>";
@@ -1236,7 +1227,8 @@ function showIncidentsForRegionBasedOnLocation(dbQueryResult, outputText, data, 
 
 	}
 	if (dbQueryResult.length > excelGenerationRecordCountLimit) {
-		outputText_new += "Please see details for incidents in excel sheet. <a href='./" + excelFileName + "' target='_blank'>Download Excel</a><br/>";
+		outputText_new += "Please see details for incidents in excel sheet.<br/>";
+		outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
 		buildExcelSheet(excelFileName, dbQueryResult, 4);
 	} else if (dbQueryResult.length > 0) {
 		outputText_new += "Please see details below for <b>" + dbQueryResult.length + "</b> incidents only. <br/>";
@@ -1269,7 +1261,8 @@ function showIncidentsForTransmissionFailureOnLocation(dbQueryResult, outputText
 
 	}
 	if (dbQueryResult.length > 0 && dbQueryResult.length > excelGenerationRecordCountLimit) {
-		outputText_new += "Please see details for master incidents in excel sheet. <a href='./" + excelFileName + "' target='_blank'>Download Excel</a><br/>";
+		outputText_new += "Please see details for incidents in excel sheet.<br/>";
+		outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
 		buildExcelSheet(excelFileName, dbQueryResult, 4);
 
 	} else if (dbQueryResult.length > 0) {
@@ -1403,6 +1396,41 @@ function buildExcelSheet(excelSheetName, dbQueryResult, noOfColumns) {
 
 }
 
+var http = require('http'),
+url = require('url'),
+fs = require('fs');
+
+ app.get('/download', function(req,res){
+	var query = url.parse(req.url, true).query;
+	res.download("./"+query.file);
+ })
+
+//create the http server listening on port 3333
+/*http.createServer(function (req, res) {
+
+ console.log(query);
+if (typeof query.file === 'undefined') {
+	//specify Content will be an attachment
+	res.setHeader('Content-disposition', 'attachment; filename=demo-queries.txt');
+	res.setHeader('Content-type', 'text/plain');
+	res.end("Hello, here is a file for you!");
+} else {
+	//read the image using fs and send the image content back in the response
+	fs.readFile('./' + query.file, function (err, content) {
+		if (err) {
+			res.writeHead(400, {'Content-type':'text/html'})
+			console.log(err);
+			res.end("No such file"+query.file);    
+		} else {
+			//specify Content will be an attachment
+			res.setHeader('Content-disposition', 'attachment; filename='+query.file);
+			res.end(content);
+		}
+	});
+}
+
+}).listen(3333);
+console.log("Server running at http://localhost:3333/");*/
 
 
 
@@ -1466,6 +1494,9 @@ function updateMessage(input, response) {
 	outputText = null;
 	return response;
 }
+
+
+
 
 
 
