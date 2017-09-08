@@ -1404,71 +1404,6 @@ fs = require('fs');
 	res.download("./"+query.file);
  })
 
-//create the http server listening on port 3333
-/*http.createServer(function (req, res) {
-
- console.log(query);
-if (typeof query.file === 'undefined') {
-	//specify Content will be an attachment
-	res.setHeader('Content-disposition', 'attachment; filename=demo-queries.txt');
-	res.setHeader('Content-type', 'text/plain');
-	res.end("Hello, here is a file for you!");
-} else {
-	//read the image using fs and send the image content back in the response
-	fs.readFile('./' + query.file, function (err, content) {
-		if (err) {
-			res.writeHead(400, {'Content-type':'text/html'})
-			console.log(err);
-			res.end("No such file"+query.file);    
-		} else {
-			//specify Content will be an attachment
-			res.setHeader('Content-disposition', 'attachment; filename='+query.file);
-			res.end(content);
-		}
-	});
-}
-
-}).listen(3333);
-console.log("Server running at http://localhost:3333/");*/
-
-
-
-function insertIntoCloudant() {
-
-	//	console.log('require nano code');
-	/*var nano = require('nano')('https://0a837ada-e321-49ec-af85-1a01a75db07b-bluemix:0f229a3211708220ca9101ec2bd6a276114955be9a191c14251618e3f86c0cff@0a837ada-e321-49ec-af85-1a01a75db07b-bluemix.cloudant.com');
-	var prints = nano.use('vodacom-chatbot');
-	if (data.intents && data.intents[0] && data.entities && data.entities[0]) {
-		prints.insert({
-			'_id':  uuid.v4(),
-			'request': data.input.text,
-			'response': outputText,
-			'response_intent': data.intents[0].intent,
-			'resp_intent_confidence': data.intents[0].confidence,
-			'resp_entity': data.entities[0].entity,
-			'resp_entity_confidence': data.entities[0].confidence,
-			'conversationId':data.context.conversation_id,
-			'date': new Date(),
-			'time': new Date()
-		   });
-	
-	} else if (data.intents && data.intents[0]) {	
-		prints.insert({
-			'_id':  uuid.v4(),
-			'request': data.input.text,
-			'response': outputText,
-			'response_intent': data.intents[0].intent,
-			'resp_intent_confidence': data.intents[0].confidence,
-			'resp_entity': data.entities[0].entity,
-			'resp_entity_confidence': data.entities[0].confidence,
-			'conversationId':data.context.conversation_id,
-			'date': new Date(),
-			'time': new Date()
-		   });
-   }*/
-
-
-}
 
 
 /**
@@ -1493,11 +1428,5 @@ function updateMessage(input, response) {
 	outputText = null;
 	return response;
 }
-
-
-
-
-
-
 
 module.exports = app;
