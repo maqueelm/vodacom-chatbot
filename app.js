@@ -550,6 +550,7 @@ app.post('/api/message', function (req, res) {
 			
 				*/
 				var goToIncidentIntent = false;
+				var incidentFlow = false;
 				console.log("i am here 11");
 				if (data.context.cxt_location_name_trx_flow == null && data.context.cxt_tx_name == null && data.context.cxt_region_name == null && data.context.cxt_matched_customer_name == null && data.context.cxt_ci_flow_site_name == null && data.context.cxt_customer_flow_vlan_id == null) {
 					goToIncidentIntent = true;
@@ -560,11 +561,11 @@ app.post('/api/message', function (req, res) {
 				}
 				console.log("i am here 12");
 				console.log("goToIncidentIntent=>" + goToIncidentIntent);
-
+				
 				if ((data != null && data.intents[0] != null && data.intents[0].intent == "incident" && goToIncidentIntent) || (data != null && data.entities[0] != null && data.entities[0].entity != 'sys-date' && data.intents[0].intent != "sites" && data.intents[0].intent != "regions" && data.entities[0].entity == "incidents" && goToIncidentIntent)) {
 
 					console.log("incident intent");
-
+					incidentFlow = true;
 					console.log(JSON.stringify(data));
 					if (inputText != null) {
 						regexTest = inputText.match(/INC[0-9]+/i);
@@ -714,28 +715,30 @@ app.post('/api/message', function (req, res) {
 
 				if (data != null && data.intents[0] == 'corporate-customer' || data.context.cxt_show_customer_selected_name == null) {
 
-					console.log("corporate-customer");
+					if (!incidentFlow) { // if someone search customer with query like status of customer name then this check will handle the triggering of customer.
+						console.log("corporate-customer");
 
-					//&& data.entities[0] != null && data.entities[0].entity == "corporate-customers" && data.entities[0].confidence > 0.5
-					//console.log(JSON.stringify(data));
-					var customerName = null;
-					for (i = 0; i < data.entities.length; i++) {
+						//&& data.entities[0] != null && data.entities[0].entity == "corporate-customers" && data.entities[0].confidence > 0.5
+						//console.log(JSON.stringify(data));
+						var customerName = null;
+						for (i = 0; i < data.entities.length; i++) {
 
-						if (data.entities[i] != null && data.entities[i].entity == 'corporate-customers') {
-							customerName = data.entities[i].value;
-							//data.context.cxt_matched_customer_name = customerName;
+							if (data.entities[i] != null && data.entities[i].entity == 'corporate-customers') {
+								customerName = data.entities[i].value;
+								//data.context.cxt_matched_customer_name = customerName;
+							}
 						}
-					}
 
-					console.log("customer name =>" + customerName);
-					//console.log(JSON.stringify(data));
-					if (customerName != null) {
+						console.log("customer name =>" + customerName);
+						//console.log(JSON.stringify(data));
+						if (customerName != null) {
 
-						var sql = "Select * from vlan_msr where REPLACE(REPLACE(MPLSVPN_NAME, '_', ' '), '-', ' ') like '%" + customerName + "%';";
-						console.log("customer sql =>" + sql);
-						var output = executeQuerySync(sql);
-						outputText = orchestrateBotResponseTextForCustomer(output.data.rows, data.output.text, customerName, data);
+							var sql = "Select * from vlan_msr where REPLACE(REPLACE(MPLSVPN_NAME, '_', ' '), '-', ' ') like '%" + customerName + "%';";
+							console.log("customer sql =>" + sql);
+							var output = executeQuerySync(sql);
+							outputText = orchestrateBotResponseTextForCustomer(output.data.rows, data.output.text, customerName, data);
 
+						}
 					}
 
 				}
@@ -959,7 +962,7 @@ function showChildIncidents(dbQueryResult, outputText, data, conversationId) {
 	if (dbQueryResult.length > excelGenerationRecordCountLimit) {
 		//outputText_new ="Please see details below for 10 child incidents only. <br/>";
 		outputText_new += "Please see details for incidents in excel sheet.<br/>";
-		outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
+		outputText_new += "<button onClick=window.open('/download/?file=" + excelFileName + "')>Download Excel</button><br/>";
 		buildExcelSheet(excelFileName, dbQueryResult, 4);
 	} else {
 		outputText_new = "Please see details below for <b>" + dbQueryResult.length + "</b> child incidents only. <br/>";
@@ -976,7 +979,7 @@ function showChildIncidents(dbQueryResult, outputText, data, conversationId) {
 		}
 		outputText_new += "</table><br/>";
 	}
-	if (data.output.text[1]!= null) {
+	if (data.output.text[1] != null) {
 		outputText = outputText_new + data.output.text[1];
 	} else {
 		outputText = outputText_new;
@@ -1121,7 +1124,7 @@ function showIncidentsForSiteName(dbQueryResult, outputText, data, conversationI
 	if (dbQueryResult.length > excelGenerationRecordCountLimit) {
 		//outputText_new +="Please see details below for 10 incidents only. <br/>";
 		outputText_new += "Please see details for incidents in excel sheet.<br/>";
-		outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
+		outputText_new += "<button onClick=window.open('/download/?file=" + excelFileName + "')>Download Excel</button><br/>";
 		buildExcelSheet(excelFileName, dbQueryResult, 4);
 	} else {
 		outputText_new += "Please see details. <br/>";
@@ -1156,7 +1159,7 @@ function DisplyDetailsForMasterIncidents(dbQueryResult, outputText, data, conver
 		if (dbQueryResult.length > 0 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 			//outputText_new +="Please see details below for 10 incidents only. <br/>";
 			outputText_new += "Please see details for incidents in excel sheet.<br/>";
-			outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
+			outputText_new += "<button onClick=window.open('/download/?file=" + excelFileName + "')>Download Excel</button><br/>";
 			buildExcelSheet(excelFileName, dbQueryResult, 4);
 		} else {
 			outputText_new += "Displaying <b>" + dbQueryResult.length + "</b> master incidents.<br/>";
@@ -1173,8 +1176,8 @@ function DisplyDetailsForMasterIncidents(dbQueryResult, outputText, data, conver
 		}
 	}
 
-	if (data.output.text[0] != null){
-		outputText = outputText_new + data.output.text[0];	
+	if (data.output.text[0] != null) {
+		outputText = outputText_new + data.output.text[0];
 	} else {
 		outputText = outputText_new;
 	}
@@ -1191,7 +1194,7 @@ function showMasterIncidentsForRegion(dbQueryResult, outputText, data, conversat
 		if (dbQueryResult.length > 0 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 			//outputText_new +="Please see details below for 10 incidents only. <br/>";
 			outputText_new += "Please see details for incidents in excel sheet.<br/>";
-			outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
+			outputText_new += "<button onClick=window.open('/download/?file=" + excelFileName + "')>Download Excel</button><br/>";
 			buildExcelSheet(excelFileName, dbQueryResult, 4);
 		} else {
 			outputText_new += "Displaying <b>" + dbQueryResult.length + "</b> master incidents that have child association. <br/>";
@@ -1208,8 +1211,8 @@ function showMasterIncidentsForRegion(dbQueryResult, outputText, data, conversat
 		}
 	}
 
-	if (data.output.text[0] != null){
-		outputText = outputText_new + data.output.text[0];	
+	if (data.output.text[0] != null) {
+		outputText = outputText_new + data.output.text[0];
 	} else {
 		outputText = outputText_new;
 	}
@@ -1227,7 +1230,7 @@ function showIncidentsForRegionBasedOnLocation(dbQueryResult, outputText, data, 
 	}
 	if (dbQueryResult.length > excelGenerationRecordCountLimit) {
 		outputText_new += "Please see details for incidents in excel sheet.<br/>";
-		outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
+		outputText_new += "<button onClick=window.open('/download/?file=" + excelFileName + "')>Download Excel</button><br/>";
 		buildExcelSheet(excelFileName, dbQueryResult, 4);
 	} else if (dbQueryResult.length > 0) {
 		outputText_new += "Please see details below for <b>" + dbQueryResult.length + "</b> incidents only. <br/>";
@@ -1243,8 +1246,8 @@ function showIncidentsForRegionBasedOnLocation(dbQueryResult, outputText, data, 
 		}
 		outputText_new += "</table><br/>";
 	}
-	if (data.output.text[0] != null){
-		outputText = outputText_new + data.output.text[0];	
+	if (data.output.text[0] != null) {
+		outputText = outputText_new + data.output.text[0];
 	} else {
 		outputText = outputText_new;
 	}
@@ -1261,7 +1264,7 @@ function showIncidentsForTransmissionFailureOnLocation(dbQueryResult, outputText
 	}
 	if (dbQueryResult.length > 0 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 		outputText_new += "Please see details for incidents in excel sheet.<br/>";
-		outputText_new += "<button onClick=window.open('/download/?file="+excelFileName+"')>Download Excel</button><br/>";
+		outputText_new += "<button onClick=window.open('/download/?file=" + excelFileName + "')>Download Excel</button><br/>";
 		buildExcelSheet(excelFileName, dbQueryResult, 4);
 
 	} else if (dbQueryResult.length > 0) {
@@ -1332,7 +1335,7 @@ function orchestrateBotResponseTextForTransmissionFailures(dbQueryResult, output
 		outputText = S(outputText).replaceAll('[master_incident_count]', "<b>" + masterIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[child_incident_count]', "<b>" + childIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[is_are]', is_are).s;
-		if (dbQueryResult[0].incidentCount > 0 ) {
+		if (dbQueryResult[0].incidentCount > 0) {
 			outputText_new = "<br/>Do you want to further drill down the search? reply with <b>yes or no</b>.";
 		} else {
 			outputText_new = "<br/><b>No</b> incidents found against the given domain. If you want to search anything else reply with <b>yes</b>.";
@@ -1342,7 +1345,7 @@ function orchestrateBotResponseTextForTransmissionFailures(dbQueryResult, output
 	}
 	// this condition will handle the use case when in flow of intent 4 some one types again transmission failure domain when ask for yes or no.
 	var pos = outputText.indexOf('exit');
-	console.log("pos=>"+pos);
+	console.log("pos=>" + pos);
 	if (pos > 0) {
 		outputText = outputText;
 	} else {
@@ -1398,19 +1401,19 @@ function buildExcelSheet(excelSheetName, dbQueryResult, noOfColumns) {
 			console.log('congratulations, your workbook created');
 	});
 
-	
+
 
 
 }
 
 var http = require('http'),
-url = require('url'),
-fs = require('fs');
+	url = require('url'),
+	fs = require('fs');
 
- app.get('/download', function(req,res){
+app.get('/download', function (req, res) {
 	var query = url.parse(req.url, true).query;
-	res.download("./"+query.file);
- })
+	res.download("./" + query.file);
+})
 
 
 
