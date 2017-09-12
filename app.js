@@ -787,7 +787,7 @@ app.post('/api/message', function (req, res) {
 				*/
 
 
-				if (data != null && data.intents[0] != null && data.intents[0].intent == "escalation" || (data.entities[0] != null && data.entities[0] == 'escalation')) {
+				if (data != null && data.intents[0] != null && data.intents[0].intent == "escalation" && data.intents[0].confidence > 0.5 || (data.entities[0] != null && data.entities[0] == 'escalation')) {
 
 					inputText = S(inputText).replaceAll('shift', '').s;
 					inputText = S(inputText).replaceAll('report', '').s;
@@ -1332,7 +1332,7 @@ function orchestrateBotResponseTextForTransmissionFailures(dbQueryResult, output
 		outputText = S(outputText).replaceAll('[master_incident_count]', "<b>" + masterIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[child_incident_count]', "<b>" + childIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[is_are]', is_are).s;
-		if (dbQueryResult[0].incidentCount > 0) {
+		if (dbQueryResult[0].incidentCount > 0 ) {
 			outputText_new = "<br/>Do you want to further drill down the search? reply with <b>yes or no</b>.";
 		} else {
 			outputText_new = "<br/><b>No</b> incidents found against the given domain. If you want to search anything else reply with <b>yes</b>.";
@@ -1340,7 +1340,15 @@ function orchestrateBotResponseTextForTransmissionFailures(dbQueryResult, output
 
 
 	}
-	return outputText += outputText_new;
+	// this condition will handle the use case when in flow of intent 4 some one types again transmission failure domain when ask for yes or no.
+	var pos = outputText.indexOf('exit');
+	console.log("pos=>"+pos);
+	if (pos > 0) {
+		outputText = outputText;
+	} else {
+		outputText += outputText_new;
+	}
+	return outputText;
 }
 
 
