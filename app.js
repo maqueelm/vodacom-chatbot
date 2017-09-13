@@ -29,6 +29,7 @@ var inputText = null;
 var outputText = null;
 var regexTest = null;
 var conversationId = null;
+var incidentFlow = false;
 var excelGenerationRecordCountLimit = 10;
 var app = express();
 var striptags = require('striptags');
@@ -511,31 +512,31 @@ app.post('/api/message', function (req, res) {
 
 				if (data.context.cxt_user_logged_in) {
 					/* SITES intent and context variable code */
-					handleSitesIntent(data, inputText, outputText);
+					outputText = handleSitesIntent(data, inputText, outputText);
 
 					/*Incident Intent Handling.*/
-					handleIncidentIntent(data, inputText, outputText);
+					outputText = handleIncidentIntent(data, inputText, outputText,incidentFlow);
 
 
 					/*Region Intent Handling.*/
-					handleRegionIntent(data, inputText, outputText);
+					outputText = handleRegionIntent(data, inputText, outputText);
 
 
 
 					/*Corporate Customer Intent handling.*/
-					handleCustomerIntent(data, inputText, outputText);
+					outputText = handleCustomerIntent(data, inputText, outputText,incidentFlow);
 
 
 					/*
 						transmission failure Intent handling.
 					*/
-					handleTransmissionFailureIntent(data, inputText, outputText);
+					outputText = handleTransmissionFailureIntent(data, inputText, outputText);
 
 
 					/*
 					Escalation Intent Handling.
 					*/
-					handleEscalationIntent(data, inputText, outputText);
+					outputText = handleEscalationIntent(data, inputText, outputText);
 
 
 					//console.log("replacing location name in message if there are any.");
@@ -616,15 +617,15 @@ function handleSitesIntent(data, inputText, outputText) {
 			data.context.cxt_ci_flow_site_name = null;
 		}
 	}
-	
+	return outputText;
 
 }
 
 function handleTransmissionFailureIntent(data, inputText, outputText) {
-	console.log("handleTransmissionFailureIntent");
+	
 	if (data != null && data.intents[0] != null && data.intents[0].intent == "tier-cause-transmission-failure" || (data != null && data.entities[0] != null && data.entities[0].entity == "transmission-failures")) {
 
-		console.log("tier-cause-transmission-failure");
+		console.log("handleTransmissionFailureIntent");
 
 		//console.log(JSON.stringify(data));
 		var tier_cause_search_term = null;
@@ -660,14 +661,16 @@ function handleTransmissionFailureIntent(data, inputText, outputText) {
 
 	}
 
+	return outputText;
+
 }
 
 function handleCustomerIntent(data, inputText, outputText,incidentFlow) {
-	console.log("handleCustomerIntent");
+	
 	if (data != null && data.intents[0] == 'corporate-customer' || data.context.cxt_show_customer_selected_name == null) {
 
 		if (!incidentFlow) { // if someone search customer with query like status of customer name then this check will handle the triggering of customer.
-			console.log("corporate-customer");
+			console.log("handleCustomerIntent");
 
 			//&& data.entities[0] != null && data.entities[0].entity == "corporate-customers" && data.entities[0].confidence > 0.5
 			//console.log(JSON.stringify(data));
@@ -693,11 +696,13 @@ function handleCustomerIntent(data, inputText, outputText,incidentFlow) {
 		}
 
 	}
+	
+	return outputText;
 
 }
 
 function handleRegionIntent(data, inputText, outputText) {
-	console.log("handleRegionIntent");
+	
 	if (data != null && data.entities != null && data.entities[0] != 'escalation' && data.context.cxt_matched_customer_name == null && (data.intents[0] != null && data.intents[0].intent == "regions" && data.intents[0].confidence > 0.5)) {
 
 		if (data.entities != null && data.entities.length <= 3
@@ -705,7 +710,7 @@ function handleRegionIntent(data, inputText, outputText) {
 			&& ((data.entities[0] != null && data.entities[0].entity == "regions") || (data.entities[1] != null && data.entities[1].entity == "regions") || (data.entities[0] != null && data.entities[0].entity == "sys-location" || data.entities[1] != null && data.entities[1].entity == "sys-location"))
 
 		) {
-			console.log("region intent");
+			console.log("handleRegionIntent");
 
 
 			var regionName_1 = "";
@@ -755,14 +760,16 @@ function handleRegionIntent(data, inputText, outputText) {
 		}
 	}
 
+	return outputText;
+
 }
 
 
-function handleIncidentIntent(data, inputText, outputText) {
+function handleIncidentIntent(data, inputText, outputText,incidentFlow) {
 
 	var goToIncidentIntent = false;
-	var incidentFlow = false;
-	console.log("handleIncidentIntent");
+	
+	
 	if (data.context.cxt_location_name_trx_flow == null && data.context.cxt_tx_name == null && data.context.cxt_region_name == null && data.context.cxt_matched_customer_name == null && data.context.cxt_ci_flow_site_name == null && data.context.cxt_customer_flow_vlan_id == null) {
 		goToIncidentIntent = true;
 		if (data.entities[0] != null && data.entities[0].entity == '2g-sites') {
@@ -775,7 +782,7 @@ function handleIncidentIntent(data, inputText, outputText) {
 
 	if ((data != null && data.intents[0] != null && data.intents[0].intent == "incident" && goToIncidentIntent) || (data != null && data.entities[0] != null && data.entities[0].entity != 'sys-date' && data.intents[0].intent != "sites" && data.intents[0].intent != "regions" && data.entities[0].entity == "incidents" && goToIncidentIntent)) {
 
-		console.log("incident intent");
+		console.log("handleIncidentIntent");
 		incidentFlow = true;
 		console.log(JSON.stringify(data));
 		if (inputText != null) {
@@ -858,12 +865,14 @@ function handleIncidentIntent(data, inputText, outputText) {
 
 	}
 
+	return outputText;
+
 }
 
 function handleEscalationIntent(data, inputText, outputText) {
-	console.log("handleEscalationIntent");
+	
 	if (data != null && data.intents[0] != null && data.intents[0].intent == "escalation" && data.intents[0].confidence > 0.5 || (data.entities[0] != null && data.entities[0] == 'escalation')) {
-
+		console.log("handleEscalationIntent");
 		inputText = S(inputText).replaceAll('shift', '').s;
 		inputText = S(inputText).replaceAll('report', '').s;
 		inputText = S(inputText).replaceAll('shiftreport', '').s;
@@ -906,6 +915,8 @@ function handleEscalationIntent(data, inputText, outputText) {
 		//console.log(JSON.stringify(datadisc));
 
 	}
+
+	return outputText;
 }
 
 
