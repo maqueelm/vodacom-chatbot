@@ -17,6 +17,16 @@
     <script src="bower_components/bootstrap/js/main.js"></script>
 
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+    <script>
+        function openWindow(feedbackVal) {
+            //url
+            myWindow = window.open('/feedback/?feedbackVal='+feedbackVal);
+            alert('feedback logged successfully!');
+            myWindow.close(); 
+
+        }
+    
+    </script>
     <style>
     table{
         width:100% !important;
@@ -61,6 +71,10 @@
     }
     #scrollingChat{
         min-height:500px;
+    }
+    .timestamp{
+        float:right;
+        color:#C3100F;
     }
     </style>
 </head>

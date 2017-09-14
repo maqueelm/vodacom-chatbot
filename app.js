@@ -34,6 +34,7 @@ var excelGenerationRecordCountLimit = 10;
 var app = express();
 var striptags = require('striptags');
 var excelbuilder = require('msexcel-builder');
+var all_output = null;
 
 // Bootstrap application settings
 app.use(express.static('./public')); // load UI from public folder
@@ -96,7 +97,7 @@ app.post('/api/message', function (req, res) {
 
 
 
-				
+
 
 				if (data.context.cxt_show_incident_details != null && data.context.cxt_show_incident_details == true && data.context.cxt_incident_number != null && data.context.cxt_incident_number != -1 && data.context.cxt_is_master_incident != null && data.context.cxt_is_master_incident) {
 
@@ -341,7 +342,7 @@ app.post('/api/message', function (req, res) {
 
 
 				}
-				
+
 				// customer flow using context variables.
 				if (data.context.cxt_customer_flow_node_detail_query_executed) {
 					console.log("customer flow context variable cleared");
@@ -515,7 +516,7 @@ app.post('/api/message', function (req, res) {
 					outputText = handleSitesIntent(data, inputText, outputText);
 
 					/*Incident Intent Handling.*/
-					outputText = handleIncidentIntent(data, inputText, outputText,incidentFlow);
+					outputText = handleIncidentIntent(data, inputText, outputText, incidentFlow);
 
 
 					/*Region Intent Handling.*/
@@ -524,7 +525,7 @@ app.post('/api/message', function (req, res) {
 
 
 					/*Corporate Customer Intent handling.*/
-					outputText = handleCustomerIntent(data, inputText, outputText,incidentFlow);
+					outputText = handleCustomerIntent(data, inputText, outputText, incidentFlow);
 
 
 					/*
@@ -559,7 +560,7 @@ app.post('/api/message', function (req, res) {
 							//outputText = data.output.text[0];//"Your credentials are verified. You are now logged in. ";
 							console.log(data);
 						} else {
-							
+
 							//outputText = "Invalid user name or password. Try again!<br/>" + data.output.text[0];
 							console.log(outputText);
 							data.context.cxt_user_email = null;
@@ -571,8 +572,9 @@ app.post('/api/message', function (req, res) {
 
 
 				}
-				
-				console.log("data is =>"+JSON.stringify(data));
+
+				//console.log("data is =>" + JSON.stringify(data));
+				all_output = data;
 				return res.json(updateMessage(payload, data));
 			});
 		} catch (err) {
@@ -622,7 +624,7 @@ function handleSitesIntent(data, inputText, outputText) {
 }
 
 function handleTransmissionFailureIntent(data, inputText, outputText) {
-	
+
 	if (data != null && data.intents[0] != null && data.intents[0].intent == "tier-cause-transmission-failure" || (data != null && data.entities[0] != null && data.entities[0].entity == "transmission-failures")) {
 
 		console.log("handleTransmissionFailureIntent");
@@ -665,8 +667,8 @@ function handleTransmissionFailureIntent(data, inputText, outputText) {
 
 }
 
-function handleCustomerIntent(data, inputText, outputText,incidentFlow) {
-	
+function handleCustomerIntent(data, inputText, outputText, incidentFlow) {
+
 	if (data != null && data.intents[0] == 'corporate-customer' || data.context.cxt_show_customer_selected_name == null) {
 
 		if (!incidentFlow) { // if someone search customer with query like status of customer name then this check will handle the triggering of customer.
@@ -696,13 +698,13 @@ function handleCustomerIntent(data, inputText, outputText,incidentFlow) {
 		}
 
 	}
-	
+
 	return outputText;
 
 }
 
 function handleRegionIntent(data, inputText, outputText) {
-	
+
 	if (data != null && data.entities != null && data.entities[0] != 'escalation' && data.context.cxt_matched_customer_name == null && (data.intents[0] != null && data.intents[0].intent == "regions" && data.intents[0].confidence > 0.5)) {
 
 		if (data.entities != null && data.entities.length <= 3
@@ -765,11 +767,11 @@ function handleRegionIntent(data, inputText, outputText) {
 }
 
 
-function handleIncidentIntent(data, inputText, outputText,incidentFlow) {
+function handleIncidentIntent(data, inputText, outputText, incidentFlow) {
 
 	var goToIncidentIntent = false;
-	
-	
+
+
 	if (data.context.cxt_location_name_trx_flow == null && data.context.cxt_tx_name == null && data.context.cxt_region_name == null && data.context.cxt_matched_customer_name == null && data.context.cxt_ci_flow_site_name == null && data.context.cxt_customer_flow_vlan_id == null) {
 		goToIncidentIntent = true;
 		if (data.entities[0] != null && data.entities[0].entity == '2g-sites') {
@@ -784,7 +786,7 @@ function handleIncidentIntent(data, inputText, outputText,incidentFlow) {
 
 		console.log("handleIncidentIntent");
 		incidentFlow = true;
-		console.log(JSON.stringify(data));
+		//console.log(JSON.stringify(data));
 		if (inputText != null) {
 			regexTest = inputText.match(/INC[0-9]+/i);
 
@@ -870,7 +872,7 @@ function handleIncidentIntent(data, inputText, outputText,incidentFlow) {
 }
 
 function handleEscalationIntent(data, inputText, outputText) {
-	
+
 	if (data != null && data.intents[0] != null && data.intents[0].intent == "escalation" && data.intents[0].confidence > 0.5 || (data.entities[0] != null && data.entities[0] == 'escalation')) {
 		console.log("handleEscalationIntent");
 		inputText = S(inputText).replaceAll('shift', '').s;
@@ -1083,17 +1085,20 @@ function orchestrateBotResponseTextForIncident(dbQueryResult, outputText, respon
 			outputText += "<br/><br/> I also found that  <b>" + dbQueryResult[0].incident_number + "</b> is a <b>master</b> incident ";
 			if (childCount > 0) {
 				outputText += "and it has <b>" + child_incident_count + "</b> child incidents, if you like to see these incidents detail, reply with <b>yes</b>.";
+				
 			} else {
 				response.context.cxt_incident_number = -1;
 				outputText += "and it does not have any child incidents.<br/><br/> <b>Is there anything i can help you with? I have information about incident, region, customer, transmission failure and shift reports. Please choose one.</b>";
+				
 			}
 		} else {
 			response.context.cxt_is_master_incident = false;
 			response.context.cxt_parent_incident_number = dbQueryResult[0].parent_incident_number;
 			outputText += "<br/><br/> I found that " + dbQueryResult[0].incident_number + " child of master incident " + dbQueryResult[0].parent_incident_number + ". if you like to see the detail of master incident, reply with <b>yes</b>.";
+			
 		}
 
-
+		outputText +="<button onClick=openWindow(1);>Good</button>&nbsp;<button onClick=openWindow(-1);>Bad</button><br/>";
 
 
 	}
@@ -1477,7 +1482,58 @@ app.get('/download', function (req, res) {
 	res.download("./" + query.file);
 })
 
+// /feedback/?feedback=1
+app.get('/feedback', function (req, res) {
+	var query = url.parse(req.url, true).query;
+	var feedback_value = query.feedbackVal;
+	var save_data = false;
+	if (parseInt(feedback_value)) {
+		save_data = true;
+	} else {
+		save_data = false;
+	}
+	console.log(save_data + "="+parseInt(feedback_value));
 
+	if (save_data) {
+		var input_text = all_output.input.text;
+		if (input_text) {
+			input_text = input_text;
+		} else {
+			input_text = "";
+		}
+
+		var output_text = striptags(outputText);
+		/*if (output_text) {
+			output_text += output_text.join(" ");
+		} else {
+			output_text = "";
+		}*/
+
+		var intents = all_output.intents
+		if (intents[0]) {
+			var intent = intents[0];
+			intents = intent.intent;
+		} else {
+			intents = "";
+		}
+
+		var entities = all_output.entities
+		if (entities[0]) {
+			var entity = entities[0];
+			entities = entity.entity;
+		} else {
+			entities = "";
+		}
+		var feeds = feedback_value;
+
+		var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username) VALUES ('" + input_text + "', '" + output_text + "', '" + intents + "', '" + entities + "', '" + feeds + "','"+all_output.context.cxt_user_full_name+"');";
+		console.log("query insert feedback =>" + feedback_sql);
+		var output = executeQuerySync(feedback_sql);
+		if (output.success) {
+			console.log("Feedback Inserted into database");
+		}
+	}
+}) 
 
 /**
  * Updates the response text using the intent confidence
@@ -1498,7 +1554,7 @@ function updateMessage(input, response) {
 			response.output.text = outputText;
 		}
 	}
-	outputText = null;
+	//outputText = null;
 	return response;
 }
 
