@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Vodacom NOC Chatbot</title>
+    <title>Vodacom NOC Chatbot - Feedback</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta property="og:image" content="conversation.svg" />
@@ -18,21 +18,10 @@
 
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
     <script>
-        var myWindow = null;
-        function openWindow(feedbackVal) {
-            //url
-            myWindow = window.open('/feedback/?feedbackVal='+feedbackVal);
-            alert('feedback logged successfully!');
-            myWindow.close(); 
-
-        }
-
-        function LogThumbsDown() {
-            //url
-            myWindow = window.open('/feedback.html');         
-
-        }
-    
+    function submitForm(){
+        alert('Feedback submitted successfully!');
+        setTimeout(function () { window.close();}, 5000);
+    }
     </script>
     <style>
     table{
@@ -107,15 +96,34 @@
                             <img class="whatson-img" alt="whatson-logo" src="img/header3.jpg">
                         </div>
                         <!--SO:middle field (whatson & user box feilds-->
-                        <div id="scrollingChat" class="col-xs-12 chatbox">
-
+                        <div id="feedback-section" class="col-xs-12">
+							<form name='frm-feedback' id='frm-feedback' method='GET' action='./feedbackOptions'>
+								<table style='width:auto !important;'>
+                                        <tr>
+                                            <td colspan='2'><b>This window will auto close in 30 seconds.</b></td>
+                                        </tr>
+									<tr>
+										<td valign='top'><b>Thumbs down Reason</b></td>
+										<td valign='top'>
+										<input type='radio' name='reason' value='1' checked/>&nbsp;I don’t get it.<br/>
+										<input type='radio' name='reason' value='2'/>&nbsp;The information is wrong.<br/>
+                                        <input type='radio' name='reason' value='3'/>&nbsp;The answer is incomplete.<br/>
+                                        <input type='radio' name='reason' value='4'/>&nbsp;To complicated.<br/>
+                                        <input type='radio' name='reason' value='5'/>&nbsp;The bot didn’t get what I mean.<br/>
+                                        <input type='radio' name='reason' value='6'/>&nbsp;The experience is not nice.<br/>
+                                        <input type='radio' name='reason' value='7'/>&nbsp;The service is bad.<br/>
+										<input type='hidden' name='closeWindow' id='closeWindow' value='1' />
+										</td>
+									</tr>
+									<tr>
+										<td colspan='2'><input type='submit' name='feedback_btn' value='Submit' onclick="submitForm();" /></td>
+									</tr>
+								</table>
+							</form>
                         </div>
                         <!--EO:middle field (whatson & user box feilds-->
                         <!--SO:inputfield-->
-                        <div class="col-xs-12 input-field-container">
-                            <!-- <input class="chat-input" type="text" placeholder="Type something"> -->
-                            <input id="textInput" class="chat-input input responsive-column" placeholder="Type something" type="text" onkeydown="ConversationPanel.inputKeyDown(event, this)">
-                        </div>
+                        
                         <!--EO:inputfield-->
                     </div>
                     <!--EO : ChatBot App code -->
@@ -123,7 +131,11 @@
             </div>
         </div>
     </div>
-
+   <script>
+   
+   
+  
+   </script>
     <script src="bower_components/bootstrap/js/bootstrap.min.js"></script>
     <script src="js/common.js"></script>
     <script src="js/api.js"></script>

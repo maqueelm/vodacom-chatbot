@@ -35,9 +35,14 @@ var app = express();
 var striptags = require('striptags');
 var excelbuilder = require('msexcel-builder');
 var all_output = null;
+var lastUsedIntent = null;
+var lastUsedEntity = null;
+var userFullName = null;
+var lastOutputText = null;
 
 // Bootstrap application settings
-app.use(express.static('./public')); // load UI from public folder
+//app.use(express.static('./public')); // load UI from public folder
+app.use('/', express.static(__dirname + '/public'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
 	extended: true
@@ -557,6 +562,7 @@ app.post('/api/message', function (req, res) {
 							console.log("credentials verified");
 							data.context.cxt_user_logged_in = true;
 							data.context.cxt_user_full_name = loginOutPut.data.rows[0].first_name + " " + loginOutPut.data.rows[0].last_name;
+							userFullName = data.context.cxt_user_full_name;
 							//outputText = data.output.text[0];//"Your credentials are verified. You are now logged in. ";
 							console.log(data);
 						} else {
@@ -987,7 +993,7 @@ function orchestrateBotResponseTextForSiteName(dbQueryResult, outputText, respon
 		}
 
 
-
+		outputText = addFeedbackButton(outputText);
 
 	}
 
@@ -1015,8 +1021,9 @@ function showParentIncidentDetails(dbQueryResult, outputText, data) {
 
 
 	//console.log("response.output.text[1]"+response.output.text[1]);
-	return outputText = outputText_new + "<br/>" + data.output.text[1];// += response.output.text[1];// += outputText_new;"<br/><br/>"+ data.output.text[1];
-
+	outputText = outputText_new + "<br/>" + data.output.text[1];// += response.output.text[1];// += outputText_new;"<br/><br/>"+ data.output.text[1];
+	outputText = addFeedbackButton(outputText);
+	return outputText;
 }
 
 function showChildIncidents(dbQueryResult, outputText, data, conversationId) {
@@ -1047,6 +1054,8 @@ function showChildIncidents(dbQueryResult, outputText, data, conversationId) {
 	} else {
 		outputText = outputText_new;
 	}
+
+	outputText = addFeedbackButton(outputText);
 
 	return outputText;
 
@@ -1085,20 +1094,20 @@ function orchestrateBotResponseTextForIncident(dbQueryResult, outputText, respon
 			outputText += "<br/><br/> I also found that  <b>" + dbQueryResult[0].incident_number + "</b> is a <b>master</b> incident ";
 			if (childCount > 0) {
 				outputText += "and it has <b>" + child_incident_count + "</b> child incidents, if you like to see these incidents detail, reply with <b>yes</b>.";
-				
+
 			} else {
 				response.context.cxt_incident_number = -1;
 				outputText += "and it does not have any child incidents.<br/><br/> <b>Is there anything i can help you with? I have information about incident, region, customer, transmission failure and shift reports. Please choose one.</b>";
-				
+
 			}
 		} else {
 			response.context.cxt_is_master_incident = false;
 			response.context.cxt_parent_incident_number = dbQueryResult[0].parent_incident_number;
 			outputText += "<br/><br/> I found that " + dbQueryResult[0].incident_number + " child of master incident " + dbQueryResult[0].parent_incident_number + ". if you like to see the detail of master incident, reply with <b>yes</b>.";
-			
+
 		}
 
-		outputText +="<button onClick=openWindow(1);>Good</button>&nbsp;<button onClick=openWindow(-1);>Bad</button><br/>";
+		outputText = addFeedbackButton(outputText);
 
 
 	}
@@ -1142,8 +1151,8 @@ function orchestrateBotResponseTextForRegion(dbQueryResult, outputText, regionNa
 
 	}
 
-	outputText += "<br/><br/>Would you like to see details of master incident with linked child incidents or are you looking for an isolated fault? Please reply with master or fault."
-
+	//outputText += "<br/><br/>Would you like to see details of master incident with linked child incidents or are you looking for an isolated fault? Please reply with master or fault."
+	outputText = addFeedbackButton(outputText);
 
 	return outputText;
 }
@@ -1184,6 +1193,7 @@ function showIncidentsForSiteName(dbQueryResult, outputText, data, conversationI
 		} else {
 			outputText = outputText_new;
 		}
+		outputText = addFeedbackButton(outputText);
 		return outputText;
 	}
 	outputText_new = "There are total <b>" + dbQueryResult.length + "</b> incidents. ";
@@ -1212,6 +1222,7 @@ function showIncidentsForSiteName(dbQueryResult, outputText, data, conversationI
 	} else {
 		outputText = outputText_new;
 	}
+	outputText = addFeedbackButton(outputText);
 	return outputText;
 }
 
@@ -1247,6 +1258,7 @@ function DisplyDetailsForMasterIncidents(dbQueryResult, outputText, data, conver
 	} else {
 		outputText = outputText_new;
 	}
+	outputText = addFeedbackButton(outputText);
 	return outputText;
 }
 
@@ -1282,6 +1294,7 @@ function showMasterIncidentsForRegion(dbQueryResult, outputText, data, conversat
 	} else {
 		outputText = outputText_new;
 	}
+	outputText = addFeedbackButton(outputText);
 	return outputText;
 }
 
@@ -1317,6 +1330,7 @@ function showIncidentsForRegionBasedOnLocation(dbQueryResult, outputText, data, 
 	} else {
 		outputText = outputText_new;
 	}
+	outputText = addFeedbackButton(outputText);
 	return outputText;
 }
 
@@ -1351,6 +1365,7 @@ function showIncidentsForTransmissionFailureOnLocation(dbQueryResult, outputText
 	} else {
 		outputText = outputText_new;
 	}
+	outputText = addFeedbackButton(outputText);
 	return outputText;
 }
 
@@ -1418,6 +1433,7 @@ function orchestrateBotResponseTextForTransmissionFailures(dbQueryResult, output
 		if (outputText_new != '')
 			outputText += outputText_new;
 	}
+	outputText = addFeedbackButton(outputText);
 	return outputText;
 }
 
@@ -1482,6 +1498,18 @@ app.get('/download', function (req, res) {
 	res.download("./" + query.file);
 })
 
+app.get('/feedbackOptions', function (req, res) {
+
+	var query = url.parse(req.url, true).query;
+	//console.log(query.reason);
+	var feedbackReason = query.reason;
+	if (feedbackReason && all_output) {
+		//console.log(all_output);
+		var feedback_value = -1; // -1 is for thumbs down
+		recordFeedback(all_output,feedbackReason,feedback_value);
+	}
+})
+
 // /feedback/?feedback=1
 app.get('/feedback', function (req, res) {
 	var query = url.parse(req.url, true).query;
@@ -1492,48 +1520,96 @@ app.get('/feedback', function (req, res) {
 	} else {
 		save_data = false;
 	}
-	console.log(save_data + "="+parseInt(feedback_value));
+	//console.log(save_data + "=" + parseInt(feedback_value));
 
-	if (save_data) {
-		var input_text = all_output.input.text;
-		if (input_text) {
-			input_text = input_text;
-		} else {
-			input_text = "";
-		}
-
-		var output_text = striptags(outputText);
-		/*if (output_text) {
-			output_text += output_text.join(" ");
-		} else {
-			output_text = "";
-		}*/
-
-		var intents = all_output.intents
-		if (intents[0]) {
-			var intent = intents[0];
-			intents = intent.intent;
-		} else {
-			intents = "";
-		}
-
-		var entities = all_output.entities
-		if (entities[0]) {
-			var entity = entities[0];
-			entities = entity.entity;
-		} else {
-			entities = "";
-		}
-		var feeds = feedback_value;
-
-		var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username) VALUES ('" + input_text + "', '" + output_text + "', '" + intents + "', '" + entities + "', '" + feeds + "','"+all_output.context.cxt_user_full_name+"');";
-		console.log("query insert feedback =>" + feedback_sql);
-		var output = executeQuerySync(feedback_sql);
-		if (output.success) {
-			console.log("Feedback Inserted into database");
-		}
+	if (save_data && all_output) {
+		recordFeedback(all_output,null,feedback_value);
 	}
-}) 
+})
+
+function addFeedbackButton(outputText){
+	outputText +="&nbsp;&nbsp;<img src='img/thumbsup-blue.png' class='feedback-img' title='good' onClick='openWindow(1);' />&nbsp;&nbsp;<img src='img/thumbsdown-red.png' class='feedback-img' title='bad' onClick='LogThumbsDown();' /><br/>";
+	return outputText;
+}
+
+function recordFeedback(all_output,feedbackReason,feedback_value) {
+	console.log("record feedback =>"+JSON.stringify(all_output));
+	var input_text = all_output.input.text;
+	if (input_text) {
+		input_text = input_text;
+	} else {
+		input_text = "";
+	}
+
+	var output_text = striptags(outputText);
+
+	if (outputText != null) {
+
+		lastOutputText = outputText;
+	} else {
+		lastOutputText = striptags(lastOutputText);
+	}
+	
+
+	var intents = all_output.intents
+	if (intents[0]) {
+		var intent = intents[0];
+		intents = intent.intent;
+	} else {
+		intents = "";
+	}
+
+	var entities = all_output.entities
+	if (entities[0]) {
+		var entity = entities[0];
+		entities = entity.entity;
+	} else {
+		entities = "";
+	}
+	var feeds = feedback_value;
+	if (all_output.context.cxt_user_full_name != null) {
+		userFullName = all_output.context.cxt_user_full_name;
+	}
+	if (intent != null) {
+		lastUsedIntent = intent;
+	}
+	if (entity != null){
+		lastUsedEntity = entity;
+	}
+	var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','"+all_output.context.conversation_id+"','"+feedbackReason+"');";
+	//console.log("query insert feedback =>" + feedback_sql);
+	var output = executeQuerySync(feedback_sql);
+	if (output.success) {
+		console.log("Feedback Inserted into database");
+	}
+}
+
+function recordResponseTime(response) {
+	console.log("recordResponseTime");
+	var intent = null;
+	var entity = null;
+	var conversationId = null;
+	var fullName = null;
+	if (response != null) {
+		console.log(response);
+		if (response.intents[0] != null) {
+			intent = response.intents[0].intent;
+			lastUsedIntent = intent;
+		}
+		if (response.entities[0] != null) {
+			entity = response.entities[0].entity;
+			lastUsedEntity = entity;
+		}
+		conversationId = response.context.conversation_id;
+		fullName = response.context.cxt_user_full_name;
+		var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, username,conversationId) VALUES ('" + inputText + "', '" + striptags(outputText) + "', '" + intent + "', '" + entity + "','" + fullName + "','" + conversationId + "');";
+		//console.log("query insert feedback =>" + feedback_sql);
+		var output = executeQuerySync(feedback_sql);
+	}
+	
+	
+
+}
 
 /**
  * Updates the response text using the intent confidence
@@ -1544,14 +1620,18 @@ app.get('/feedback', function (req, res) {
 function updateMessage(input, response) {
 	var responseText = null;
 	if (response != null) {
+
 		if (!response.output) {
 			response.output = {};
 		} else {
 			//return response;
 		}
-		//console.log("update message method =>" + outputText);
+	//	console.log("response =>" + JSON.stringify(response));
 		if (outputText != null) {
+			
 			response.output.text = outputText;
+			lastOutputText = outputText;
+			recordResponseTime(response); // record time for every conversation message to get time of chat for one intent.
 		}
 	}
 	//outputText = null;
