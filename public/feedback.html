@@ -19,8 +19,8 @@
     <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
     <script>
     function submitForm(){
-        alert('Feedback submitted successfully!');
-        setTimeout(function () { window.close();}, 5000);
+        
+        setTimeout(function () { alert('Feedback submitted successfully!');window.close();}, 8000);
     }
     </script>
     <style>
@@ -96,11 +96,11 @@
                             <img class="whatson-img" alt="whatson-logo" src="img/header3.jpg">
                         </div>
                         <!--SO:middle field (whatson & user box feilds-->
-                        <div id="feedback-section" class="col-xs-12">
+                        <div id="feedback-section" class="col-xs-12" style='padding-left: 27%;'>
 							<form name='frm-feedback' id='frm-feedback' method='GET' action='./feedbackOptions'>
 								<table style='width:auto !important;'>
                                         <tr>
-                                            <td colspan='2'><b>This window will auto close in 30 seconds.</b></td>
+                                            <td colspan='2'><b>This window will auto close in 8 seconds after you will press submit button.</b></td>
                                         </tr>
 									<tr>
 										<td valign='top'><b>Thumbs down Reason</b></td>
@@ -108,7 +108,7 @@
 										<input type='radio' name='reason' value='1' checked/>&nbsp;I don’t get it.<br/>
 										<input type='radio' name='reason' value='2'/>&nbsp;The information is wrong.<br/>
                                         <input type='radio' name='reason' value='3'/>&nbsp;The answer is incomplete.<br/>
-                                        <input type='radio' name='reason' value='4'/>&nbsp;To complicated.<br/>
+                                        <input type='radio' name='reason' value='4'/>&nbsp;Too complicated.<br/>
                                         <input type='radio' name='reason' value='5'/>&nbsp;The bot didn’t get what I mean.<br/>
                                         <input type='radio' name='reason' value='6'/>&nbsp;The experience is not nice.<br/>
                                         <input type='radio' name='reason' value='7'/>&nbsp;The service is bad.<br/>
@@ -116,7 +116,8 @@
 										</td>
 									</tr>
 									<tr>
-										<td colspan='2'><input type='submit' name='feedback_btn' value='Submit' onclick="submitForm();" /></td>
+                                        <td>&nbsp;</td>
+										<td><input type='submit' name='feedback_btn' value='Submit' onclick="submitForm();" />&nbsp;<button name='cancel' onclick='javascript:window.close();'>Cancel</button></td>
 									</tr>
 								</table>
 							</form>

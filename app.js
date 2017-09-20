@@ -508,6 +508,7 @@ app.post('/api/message', function (req, res) {
 
 
 							}
+							outputText = addFeedbackButton(outputText);
 							outputText += "<br/>" + data.output.text[0];
 
 						}
@@ -567,8 +568,12 @@ app.post('/api/message', function (req, res) {
 							console.log(data);
 						} else {
 
-							//outputText = "Invalid user name or password. Try again!<br/>" + data.output.text[0];
-							console.log(outputText);
+							//if ()
+							outputText = data.output.text[0];
+							if (data.output.text[1]!= null) {
+								outputText += data.output.text[1];
+							}
+							//console.log(outputText);
 							data.context.cxt_user_email = null;
 							data.context.cxt_user_password = null;
 							data.context.cxt_user_logged_in = false;
@@ -1151,8 +1156,8 @@ function orchestrateBotResponseTextForRegion(dbQueryResult, outputText, regionNa
 
 	}
 
-	//outputText += "<br/><br/>Would you like to see details of master incident with linked child incidents or are you looking for an isolated fault? Please reply with master or fault."
-	outputText = addFeedbackButton(outputText);
+	outputText += "<br/><br/>Would you like to see details of master incident with linked child incidents or are you looking for an isolated fault? Please reply with master or fault."
+	//outputText = addFeedbackButton(outputText);
 
 	return outputText;
 }
@@ -1433,7 +1438,7 @@ function orchestrateBotResponseTextForTransmissionFailures(dbQueryResult, output
 		if (outputText_new != '')
 			outputText += outputText_new;
 	}
-	outputText = addFeedbackButton(outputText);
+	//outputText = addFeedbackButton(outputText);
 	return outputText;
 }
 
@@ -1545,7 +1550,7 @@ function recordFeedback(all_output,feedbackReason,feedback_value) {
 
 	if (outputText != null) {
 
-		lastOutputText = outputText;
+		lastOutputText = striptags(outputText);
 	} else {
 		lastOutputText = striptags(lastOutputText);
 	}
@@ -1627,6 +1632,7 @@ function updateMessage(input, response) {
 			//return response;
 		}
 	//	console.log("response =>" + JSON.stringify(response));
+	console.log(outputText);
 		if (outputText != null) {
 			
 			response.output.text = outputText;
