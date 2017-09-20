@@ -1538,7 +1538,7 @@ function addFeedbackButton(outputText){
 }
 
 function recordFeedback(all_output,feedbackReason,feedback_value) {
-	console.log("record feedback =>"+JSON.stringify(all_output));
+	console.log("feedbackReason =>"+JSON.stringify(feedbackReason));
 	var input_text = all_output.input.text;
 	if (input_text) {
 		input_text = input_text;
@@ -1579,7 +1579,7 @@ function recordFeedback(all_output,feedbackReason,feedback_value) {
 		lastUsedEntity = entity;
 	}
 	console.log("last used intent"+JSON.stringify(lastUsedIntent));
-	var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','"+all_output.context.conversation_id+"','"+feedbackReason+"');";
+	var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','"+all_output.context.conversation_id+"',"+feedbackReason+");";
 	//console.log("query insert feedback =>" + feedback_sql);
 	var output = executeQuerySync(feedback_sql);
 	if (output.success) {
