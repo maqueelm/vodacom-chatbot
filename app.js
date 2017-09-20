@@ -1556,21 +1556,18 @@ function recordFeedback(all_output,feedbackReason,feedback_value) {
 	}
 	
 
-	var intents = all_output.intents
-	if (intents[0]) {
-		var intent = intents[0];
-		intents = intent.intent;
-	} else {
-		intents = "";
-	}
+	var intents = all_output.intents;
+	var intent = null;
+	if (intents[0] != null) {
+		intent = intents[0].intent;
+	} 
 
-	var entities = all_output.entities
-	if (entities[0]) {
-		var entity = entities[0];
-		entities = entity.entity;
-	} else {
-		entities = "";
-	}
+	var entities = all_output.entities;
+	var entity = null;
+	if (entities[0] != null) {
+		
+		entity = entities[0].entity;
+	} 
 	var feeds = feedback_value;
 	if (all_output.context.cxt_user_full_name != null) {
 		userFullName = all_output.context.cxt_user_full_name;
@@ -1581,6 +1578,7 @@ function recordFeedback(all_output,feedbackReason,feedback_value) {
 	if (entity != null){
 		lastUsedEntity = entity;
 	}
+	console.log("last used intent"+JSON.stringify(lastUsedIntent));
 	var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','"+all_output.context.conversation_id+"','"+feedbackReason+"');";
 	//console.log("query insert feedback =>" + feedback_sql);
 	var output = executeQuerySync(feedback_sql);
