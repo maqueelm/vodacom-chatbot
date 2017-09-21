@@ -567,7 +567,7 @@ app.post('/api/message', function (req, res) {
 							//outputText = data.output.text[0];//"Your credentials are verified. You are now logged in. ";
 							console.log(data);
 						} else {
-
+							console.log("credentials not verified");
 							//if ()
 							outputText = data.output.text[0];
 							if (data.output.text[1]!= null) {
@@ -590,6 +590,7 @@ app.post('/api/message', function (req, res) {
 			});
 		} catch (err) {
 			//TODO Handle error
+			//console.log("error=>"+JSON.stringify(err.stack));
 		}
 
 
@@ -832,46 +833,46 @@ function handleIncidentIntent(data, inputText, outputText, incidentFlow) {
 					console.log("child count for incident =>" + childoutput.data.rows[0].incidentCount);
 					childCount = childoutput.data.rows[0].incidentCount;
 				}
-				console.log("checking output condition");
+				//console.log("checking output condition");
 				if (output != null) {
-					console.log("out put is not null");
+					//console.log("out put is not null");
 					if (output.data.rows != null && output.data.rows.length > 0) {
 						console.log("found incident");
 						outputText = orchestrateBotResponseTextForIncident(output.data.rows, data.output.text, data, childCount);
 					}
 					if (output.data.rows.length == 0) {
-						console.log("in not found message.");
-						outputText = "Sorry, no result can be found against given incident number " + incident_no_str + ". Please provide with a different incident number.";
+						//console.log("in not found message.");
+						outputText = "<b>Sorry, no result can be found against given incident number " + incident_no_str + ". Please provide with a different incident number.</b>";
 					} else {
 						console.log("incident" + incident_no_str + " found");
 					}
 
 				} else {
-					console.log("out put is null");
-					outputText = "Sorry, no result can be found against given incident number " + incident_no_str + " in remedy. Please provide with a different incident number.";
+					//console.log("out put is null");
+					outputText = "<b>Sorry, no result can be found against given incident number " + incident_no_str + " in remedy. Please provide with a different incident number.</b>";
 				}
 			} else {
-				console.log("last else =>");
+				//console.log("last else =>");
 				outputText = "Yes sure, please provide me with the incident number.";
 			}
 			// handling the case for problems,change requests and tasks.
-			console.log("testing problem change and task =>");
+			//console.log("testing problem change and task =>");
 			regexTest = inputText.match(/PBI[0-9]+/i);
 			if (regexTest != null) {
-				outputText = "I am only trained to search Incidents, I cannot search problem refs.";
+				outputText = "<b>I am only trained to search Incidents, I cannot search problem refs.</b>";
 			}
 			regexTest = inputText.match(/CRQ[0-9]+/i);
 			if (regexTest != null) {
-				outputText = "I am only trained to search Incidents, I cannot search change refs.";
+				outputText = "<b>I am only trained to search Incidents, I cannot search change refs.</b>";
 			}
 			regexTest = inputText.match(/CR[0-9]+/i);
 			if (regexTest != null) {
-				outputText = "I am only trained to search Incidents, I cannot search change refs.";
+				outputText = "<b>I am only trained to search Incidents, I cannot search change refs.</b>";
 
 			}
 			regexTest = inputText.match(/TAS[0-9]+/i);
 			if (regexTest != null) {
-				outputText = "I am only trained to search Incidents, I cannot search Task refs.";
+				outputText = "<b>I am only trained to search Incidents, I cannot search Task refs.</b>";
 			}
 
 		}
@@ -1533,7 +1534,7 @@ app.get('/feedback', function (req, res) {
 })
 
 function addFeedbackButton(outputText){
-	outputText +="&nbsp;&nbsp;<img src='img/thumbsup-blue.png' class='feedback-img' title='good' onClick='openWindow(1);' />&nbsp;&nbsp;<img src='img/thumbsdown-red.png' class='feedback-img' title='bad' onClick='LogThumbsDown();' /><br/>";
+	outputText +="<br/><b>Please vote on feedback provided.</b>&nbsp;&nbsp;<img src='img/thumbsup-blue.png' class='feedback-img' title='good' onClick='openWindow(1);' />&nbsp;&nbsp;<img src='img/thumbsdown-red.png' class='feedback-img' title='bad' onClick='LogThumbsDown();' /><br/>";
 	return outputText;
 }
 
