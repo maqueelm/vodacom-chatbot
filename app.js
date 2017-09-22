@@ -109,7 +109,7 @@ app.post('/api/message', function (req, res) {
 					//console.log("data.context.cxt_parent_incident_number =>" + data.context.cxt_incident_number);
 					//console.log("data.context.cxt_show_incident_details =>" + data.context.cxt_show_incident_details);
 					//console.log("data.context.cxt_show_anything_else_msg =>" + data.context.cxt_show_anything_else_msg);
-					var childsql = "Select * from incidents where parent_incident_number = '" + data.context.cxt_incident_number + "';";
+					var childsql = "Select incident_number,summary,status,site_name from incidents where parent_incident_number = '" + data.context.cxt_incident_number + "';";
 					console.log("query from context variable =>" + childsql);
 					var childoutput = executeQuerySync(childsql);
 					outputText = showChildIncidents(childoutput.data.rows, outputText, data, conversationId);
@@ -125,7 +125,7 @@ app.post('/api/message', function (req, res) {
 					//console.log("data.context.cxt_show_incident_details =>"+ data.context.cxt_show_incident_details);
 					//console.log("data.context.cxt_show_anything_else_msg =>"+ data.context.cxt_show_anything_else_msg);
 
-					var childsql = "Select * from incidents where incident_number = '" + data.context.cxt_parent_incident_number + "';";
+					var childsql = "Select incident_number,impact,status,region,cause_tier_3,site_name,resolution_category_tier_3,assigned_group,task_assignee_group,summary,task_assignee,incident_event_start_time,incident_event_end_time, from incidents where incident_number = '" + data.context.cxt_parent_incident_number + "';";
 					console.log("query from context variable =>" + childsql);
 					var childoutput = executeQuerySync(childsql);
 					outputText = showParentIncidentDetails(childoutput.data.rows, outputText, data);
@@ -287,7 +287,7 @@ app.post('/api/message', function (req, res) {
 						}
 						inOperator += ")";
 						console.log(inOperator);
-						var incidentSql = "Select * from incidents where site_name in " + inOperator + " and Lower(status) != 'closed';";
+						var incidentSql = "Select incident_number,status,cause_tier_1,site_name,parent_incident_number,description from incidents where site_name in " + inOperator + " and Lower(status) != 'closed';";
 						console.log(incidentSql);
 						var incidentOutput = executeQuerySync(incidentSql);
 						data.context.cxt_region_flow_search_for_location = false;
@@ -329,7 +329,7 @@ app.post('/api/message', function (req, res) {
 
 						}
 						inOperator += ")";
-						var incidentSql = "Select * from incidents where site_name in " + inOperator + " and cause_tier_1 like '" + data.context.cxt_tx_name + "' and Lower(status) != 'closed' and (parent_incident_number is null OR parent_incident_number = '')";
+						var incidentSql = "Select incident_number,status,cause_tier_1,site_name,parent_incident_number,description from incidents where site_name in " + inOperator + " and cause_tier_1 like '" + data.context.cxt_tx_name + "' and Lower(status) != 'closed' and (parent_incident_number is null OR parent_incident_number = '')";
 						console.log("incident sql =>" + incidentSql);
 						var incidentOutput = executeQuerySync(incidentSql);
 						outputText = showIncidentsForTransmissionFailureOnLocation(incidentOutput.data.rows, outputText, data, conversationId);
@@ -403,7 +403,7 @@ app.post('/api/message', function (req, res) {
 						customerRegion = data.context.cxt_customer_location_text;
 					}
 
-					var sql = "Select * from vlan_msr ";
+					var sql = "Select MPLSVPN_NAME,IFNR,IFALIAS,IFACCURSTRING,NID,NODE_NM from vlan_msr ";
 					if (customerName != null) {
 						sql += " where MPLSVPN_NAME like '%" + customerName + "%'";
 
@@ -476,7 +476,7 @@ app.post('/api/message', function (req, res) {
 							//	+ output.data.rows[0].IFACCURSTRING + "<br/>" + output.data.rows[0].NID + "<br/>" + output.data.rows[0].NODE_NM + "<br/><br/>";
 							var nodeId = output.data.rows[0].NID;
 
-							var nodeSql = "select * from incidents where site_name like '%" + nodeId + "%'";
+							var nodeSql = "select incident_number,summary,status,site_name from incidents where site_name like '%" + nodeId + "%'";
 							for (j = 0; j < output.data.rows.length; j++) {
 								nodeId = output.data.rows[j].NID;
 								nodeSql += " OR site_name like '%" + nodeId + "%'"
@@ -557,7 +557,7 @@ app.post('/api/message', function (req, res) {
 					console.log("verifying user credentials");
 
 					if (data.context.cxt_user_email != null && data.context.cxt_user_password != null) {
-						var loginQuery = "Select * from bot_users where email = '" + data.context.cxt_user_email + "' and password = '" + data.context.cxt_user_password + "';";
+						var loginQuery = "Select first_name,last_name from bot_users where email = '" + data.context.cxt_user_email + "' and password = '" + data.context.cxt_user_password + "';";
 						var loginOutPut = executeQuerySync(loginQuery);
 						if (loginOutPut.data.rows.length != 0) {
 							console.log("credentials verified");
