@@ -101,6 +101,7 @@ var ConversationPanel = (function () {
         var widthValue = '100%';//(dummy.offsetWidth + padding) + 'px';
         input.setAttribute('style', 'width:' + widthValue);
         input.style.width = widthValue;
+       // input.type = "password";
       }
     }
 
@@ -163,6 +164,16 @@ var ConversationPanel = (function () {
 
     textArray.forEach(function (currentText) {
       if (currentText) {
+        //alert('change text box type');
+        if (document.getElementById('textInput').type == 'password') {
+          currentText = "**********";
+        }
+        if (currentText.indexOf('password') > 0) {
+          
+          document.getElementById('textInput').type = 'password';
+        } else{
+          document.getElementById('textInput').type = 'text';
+        }
         var messageJson = {
           // <div class='segments'>
           'tagName': 'div',
@@ -188,7 +199,7 @@ var ConversationPanel = (function () {
                 'children': [{
                   // <p>{messageText}</p>
                   'tagName': 'p',
-                  'text': currentText
+                  'text': currentText + "<br/><span class='timestamp'>"+getDateTime()+"</span>"
                 }]
               }]
             }]
@@ -237,4 +248,37 @@ var ConversationPanel = (function () {
       Common.fireEvent(inputBox, 'input');
     }
   }
+  function getDateTime() {
+    
+        var date = new Date();
+    
+        var hour = date.getHours();
+        
+        hour = (hour < 10 ? "0" : "") + hour;
+
+        
+
+        var min  = date.getMinutes();
+        min = (min < 10 ? "0" : "") + min;
+    
+        var sec  = date.getSeconds();
+        sec = (sec < 10 ? "0" : "") + sec;
+    
+        var year = date.getFullYear();
+    
+        var month = date.getMonth() + 1;
+        month = (month < 10 ? "0" : "") + month;
+    
+        var day  = date.getDate();
+        day = (day < 10 ? "0" : "") + day;
+        var formatedTime = '';
+        if (hour > 12) {
+          hour = hour - 12;
+          formatedTime = hour + ":" + min + " PM";
+        } else {
+          formatedTime = hour + ":" + min + " AM";
+        } 
+        return formatedTime;
+    
+    }
 }());
