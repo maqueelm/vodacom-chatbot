@@ -19,8 +19,9 @@ var sync = require('synchronize');
 var Regex = require('regex');
 var syncSql = require('sync-sql');
 var express = require('express'); // app server
-//var oracledb = require('oracledb');
-//var dbConfig = require('./dbconfig.js');
+var oracledb = require('oracledb');
+var dbConfig = require('./dbconfig.js');
+var excel = require('./excelGenerator.js');
 var S = require('string');
 var bodyParser = require('body-parser'); // parser for post requests
 var Conversation = require('watson-developer-cloud/conversation/v1'); // watson sdk
@@ -42,7 +43,6 @@ var lastUsedEntity = null;
 var userFullName = null;
 var lastOutputText = null;
 var oracleConnectionObject = null;
-
 // Bootstrap application settings
 //app.use(express.static('./public')); // load UI from public folder
 app.use('/', express.static(__dirname + '/public'));
@@ -54,6 +54,16 @@ app.use(bodyParser.urlencoded({
 var fiber = sync.fiber;
 var await = sync.await;
 var defer = sync.defer;
+
+var oracleConnectionString = {
+	user: dbConfig.user,
+	password: dbConfig.password,
+	connectString: dbConfig.connectString
+};
+
+
+
+
 // Create the service wrapper
 var conversation = new Conversation({
 	// If unspecified here, the CONVERSATION_USERNAME and CONVERSATION_PASSWORD env properties will be checked
@@ -99,15 +109,24 @@ app.post('/api/message', function (req, res) {
 				}
 				outputText = null;
 				conversationId = payload.context.conversation_id;
-				//	console.log("i am here");
+
+
 				// handle context variable case here
 				// show incident details intent 1 :: showing master of child.
+				//try {
+				//	fiber(function () {
+
+				var sql = "SELECT * FROM  incidents WHERE ROWNUM < 10 ORDER BY incident_number";
+
+
+				var globalResultSet = [];
+				var connection = getOracleDBConnection(oracleConnectionString);
+				var result = getOracleQueryResult(connection, sql);
+				console.log("resultRows=>" + JSON.stringify(result.rows));
 
 
 
-
-
-				if (data!=null && data.context.cxt_show_incident_details != null && data.context.cxt_show_incident_details == true && data.context.cxt_incident_number != null && data.context.cxt_incident_number != -1 && data.context.cxt_is_master_incident != null && data.context.cxt_is_master_incident) {
+				if (data != null && data.context.cxt_show_incident_details != null && data.context.cxt_show_incident_details == true && data.context.cxt_incident_number != null && data.context.cxt_incident_number != -1 && data.context.cxt_is_master_incident != null && data.context.cxt_is_master_incident) {
 
 					//console.log("data.context.cxt_parent_incident_number =>" + data.context.cxt_incident_number);
 					//console.log("data.context.cxt_show_incident_details =>" + data.context.cxt_show_incident_details);
@@ -122,7 +141,7 @@ app.post('/api/message', function (req, res) {
 				}
 				//console.log("i am here 2");
 				// show incident details intent 1 :: showing child of master
-				if (data!=null && data.context.cxt_show_incident_details != null && data.context.cxt_show_incident_details == true && data.context.cxt_parent_incident_number != null && data.context.cxt_parent_incident_number != -1 && data.context.cxt_is_master_incident != null && !data.context.cxt_is_master_incident) {
+				if (data != null && data.context.cxt_show_incident_details != null && data.context.cxt_show_incident_details == true && data.context.cxt_parent_incident_number != null && data.context.cxt_parent_incident_number != -1 && data.context.cxt_is_master_incident != null && !data.context.cxt_is_master_incident) {
 
 					//console.log("data.context.cxt_parent_incident_number =>"+ data.context.cxt_incident_number);
 					//console.log("data.context.cxt_show_incident_details =>"+ data.context.cxt_show_incident_details);
@@ -142,7 +161,7 @@ app.post('/api/message', function (req, res) {
 				//	console.log("i am here 3");
 				// intent 2 :: Master Incident
 
-				if (data!=null && data.context.cxt_region_show_master_incident) {
+				if (data != null && data.context.cxt_region_show_master_incident) {
 
 					console.log("data.context.cxt_region_name =>" + data.context.cxt_region_name);
 					var regionLookupQuery = "Select * from region_lookup where (full_name like '" + data.context.cxt_region_name + "' OR abbreviation like '" + data.context.cxt_region_name + "')";
@@ -173,7 +192,7 @@ app.post('/api/message', function (req, res) {
 				//	console.log("i am here 4");
 				// intent 2 :: isolated fault
 				// site name or node name flow
-				if (data!=null && data.context.cxt_region_show_isolated_fault && data.context.cxt_site_name_region_flow == null && !data.context.cxt_region_flow_search_for_location) {
+				if (data != null && data.context.cxt_region_show_isolated_fault && data.context.cxt_site_name_region_flow == null && !data.context.cxt_region_flow_search_for_location) {
 					// update message for entering site with actual sites in region of query.
 					if (data.context.cxt_region_full_name != null) {
 						var listOfSitesQuery = "SELECT distinct site_name FROM `incidents` WHERE region like '%" + data.context.cxt_region_full_name + "%' limit 10;";
@@ -198,7 +217,7 @@ app.post('/api/message', function (req, res) {
 					}
 
 				}
-				if (data!=null && data.context.cxt_region_show_isolated_fault && data.context.cxt_site_name_region_flow != null) {
+				if (data != null && data.context.cxt_region_show_isolated_fault && data.context.cxt_site_name_region_flow != null) {
 
 
 					console.log("data.context.cxt_site_name_region_show_incident_detail=>" + data.context.cxt_site_name_region_show_incident_detail);
@@ -269,7 +288,7 @@ app.post('/api/message', function (req, res) {
 					console.log("Region Flow => data.context.cxt_site_name_region_show_incident_detail=>" + data.context.cxt_site_name_region_show_incident_detail);
 				}
 				//console.log("i am here 5");
-				if (data!=null && data.context.cxt_location_name_region_flow != null) {
+				if (data != null && data.context.cxt_location_name_region_flow != null) {
 					data.context.cxt_location_name_region_flow_found = true;
 					console.log("data.context.cxt_location_name_region_flow_found =>" + data.context.cxt_location_name_region_flow_found);
 					var locationSql = "Select * from locations_lookup where location_name like '%" + data.context.cxt_location_name_region_flow + "%'";
@@ -308,7 +327,7 @@ app.post('/api/message', function (req, res) {
 				}
 				//console.log("i am here 6");
 				// transmission location flow : intent
-				if (data!=null && data.context.cxt_location_name_trx_flow != null) {
+				if (data != null && data.context.cxt_location_name_trx_flow != null) {
 
 					console.log("data.context.cxt_location_name_trx_flow =>" + data.context.cxt_location_name_trx_flow);
 					//var locationSql = "Select object_class from locations_lookup where location_name like '%" + data.context.cxt_location_name_trx_flow + "%'";
@@ -352,7 +371,7 @@ app.post('/api/message', function (req, res) {
 				}
 
 				// customer flow using context variables.
-				if (data!=null && data.context.cxt_customer_flow_node_detail_query_executed) {
+				if (data != null && data.context.cxt_customer_flow_node_detail_query_executed) {
 					console.log("customer flow context variable cleared");
 					data.context.cxt_show_customer_selected_name = null;
 					data.context.cxt_matched_customer_name = null;
@@ -377,7 +396,7 @@ app.post('/api/message', function (req, res) {
 
 				}
 				//console.log("i am here 8");
-				if (data!=null && data.context.cxt_customer_flow_found != null) {
+				if (data != null && data.context.cxt_customer_flow_found != null) {
 
 
 
@@ -525,7 +544,13 @@ app.post('/api/message', function (req, res) {
 
 				}
 
-				if (data!=null && data.context.cxt_user_logged_in) {
+
+
+
+
+
+
+				if (data != null && data.context.cxt_user_logged_in) {
 
 					console.log("user is logged in now checking intent");
 					/* SITES intent and context variable code */
@@ -563,7 +588,7 @@ app.post('/api/message', function (req, res) {
 					}
 				}
 
-				if (data!=null && !data.context.cxt_user_logged_in && data.context.cxt_verify_user) {
+				if (data != null && !data.context.cxt_user_logged_in && data.context.cxt_verify_user) {
 					console.log("verifying user credentials");
 
 					if (data.context.cxt_user_email != null && data.context.cxt_user_password != null) {
@@ -580,7 +605,7 @@ app.post('/api/message', function (req, res) {
 							console.log("credentials not verified");
 							//if ()
 							outputText = data.output.text[0];
-							if (data.output.text[1]!= null) {
+							if (data.output.text[1] != null) {
 								outputText += data.output.text[1];
 							}
 							//console.log(outputText);
@@ -594,9 +619,9 @@ app.post('/api/message', function (req, res) {
 
 				}
 
-				console.log("data is =>" + JSON.stringify(data));
+				//console.log("data is =>" + JSON.stringify(data));
 				if (data) {
-				all_output = data;
+					all_output = data;
 				} else {
 					outputText = "Conversation service is not responding in timely manner. Sorry for inconvenience.";
 				}
@@ -604,7 +629,7 @@ app.post('/api/message', function (req, res) {
 			});
 		} catch (err) {
 			//TODO Handle error
-			console.log("error=>"+JSON.stringify(err.stack));
+			console.log("error=>" + JSON.stringify(err.stack));
 		}
 
 
@@ -612,8 +637,6 @@ app.post('/api/message', function (req, res) {
 
 
 });
-
-
 
 function handleSitesIntent(data, inputText, outputText) {
 	console.log("handleSitesIntent");
@@ -792,7 +815,6 @@ function handleRegionIntent(data, inputText, outputText) {
 
 }
 
-
 function handleIncidentIntent(data, inputText, outputText, incidentFlow) {
 
 	var goToIncidentIntent = false;
@@ -947,65 +969,9 @@ function handleEscalationIntent(data, inputText, outputText) {
 	return outputText;
 }
 
-/*var connectionArray = {
-	user          : dbConfig.user,
-	password      : dbConfig.password,
-	connectString : dbConfig.connectString
-  };*/
-function getOracleConnection(sql){
-	
-	/*oracledb.getConnection(connectionArray,function(err, connection){
-		if (err) {
-		  console.error(err.message);
-		  return;
-		}
-		//JSON.stringify(connection) 
-		var stream = connection.queryStream(sql);
-		stream.on('error', function (error) {
-			console.error(error.message);
-			doRelease(connection);
-			return;
-		  });
-		  stream.on('data', function (data) {
-			// handle data row...
-			
-			//data;
-			
-		  });
-		stream.on('end', function () {
-			// release connection...
-			console.log("release connection");
-			doRelease(connection);
-		  }); 
-		 console.log("globalDataRows =>"+JSON.stringify(globalDataRows)); 
-			
-		  
-	  });*/
-}
-fiber(function () {	  
-//await(getOracleConnection("select * from incidents", defer()));
-});
-
-
-
-
-
-
-  
-  // Note: connections should always be released when not needed
-  function doRelease(connection) {
-	connection.close(
-	  function(err) {
-		if (err) {
-		  console.error(err.message);
-		}
-	  });
-  }
 
 
 function executeQuerySync(sql) {
-
-
 
 	var output = syncSql.mysql(
 		{
@@ -1376,17 +1342,17 @@ function showMasterIncidentsForRegion(dbQueryResult, outputText, data, conversat
 function showIncidentsForRegionBasedOnLocation(dbQueryResult, outputText, data, conversationId) {
 	var outputText_new = "";
 	var excelFileName = "incidentListInRegionBasedOnLocation_" + conversationId + "_" + new Date().getTime() + ".xlsx";
-	if (dbQueryResult!=null && dbQueryResult.length != 0) {
+	if (dbQueryResult != null && dbQueryResult.length != 0) {
 		outputText_new = "There are total <b>" + dbQueryResult.length + "</b> incidents. ";
 	} else {
 		outputText_new = "No incident data available in remedy for location " + data.context.cxt_location_name_region_flow + ". <br/><br/>";
 
 	}
-	if (dbQueryResult!=null && dbQueryResult.length > excelGenerationRecordCountLimit) {
+	if (dbQueryResult != null && dbQueryResult.length > excelGenerationRecordCountLimit) {
 		outputText_new += "Please see details for incidents in excel sheet.<br/>";
 		outputText_new += "<button onClick=window.open('/download/?file=" + excelFileName + "')>Download Excel</button><br/>";
 		buildExcelSheet(excelFileName, dbQueryResult, 4);
-	} else if (dbQueryResult!=null && dbQueryResult.length > 0) {
+	} else if (dbQueryResult != null && dbQueryResult.length > 0) {
 		outputText_new += "Please see details below for <b>" + dbQueryResult.length + "</b> incidents only. <br/>";
 		outputText_new += "<table class='w-80'>";
 		outputText_new += "<tr><th>INCIDENT NUMBER</th><th>DESCRIPTION</th><th>STATUS</th><th>SITE NAME</th></tr>";
@@ -1520,49 +1486,7 @@ function orchestrateBotResponseTextForShiftReports(dbQueryResult) {
 	return responseText;
 }
 
-function buildExcelSheet(excelSheetName, dbQueryResult, noOfColumns) {
 
-	// Create a new workbook file in current working-path 
-	var workbook = excelbuilder.createWorkbook('./', excelSheetName)
-
-	// Create a new worksheet with 10 columns and 12 rows 
-	var numberOfRows = dbQueryResult.length;
-	var sheet1 = workbook.createSheet('data', noOfColumns, Number(numberOfRows) + Number(1));
-
-	// Fill some data 
-	sheet1.set(1, 1, 'Incident Number');
-	sheet1.set(2, 1, 'Description');
-	sheet1.set(3, 1, 'Status');
-	sheet1.set(4, 1, 'Site Name');
-	var j = 0;
-	var numberOfRowsNew = Number(numberOfRows) + Number(2);
-
-	for (var i = 2; i < numberOfRowsNew; i++) {
-		//sheet1.set(col, row, data);
-		//console.log(i);
-		sheet1.set(1, i, dbQueryResult[j].incident_number);
-		sheet1.set(2, i, dbQueryResult[j].summary);
-		sheet1.set(3, i, dbQueryResult[j].status);
-		sheet1.set(4, i, dbQueryResult[j].site_name);
-		if (j == numberOfRows) {
-			break;
-		} else {
-			j++;
-		}
-	}
-
-	// Save it 
-	workbook.save(function (ok) {
-		if (!ok)
-			workbook.cancel();
-		else
-			console.log('congratulations, your workbook created');
-	});
-
-
-
-
-}
 
 var http = require('http'),
 	url = require('url'),
@@ -1581,7 +1505,7 @@ app.get('/feedbackOptions', function (req, res) {
 	if (feedbackReason && all_output) {
 		//console.log(all_output);
 		var feedback_value = -1; // -1 is for thumbs down
-		recordFeedback(all_output,feedbackReason,feedback_value);
+		recordFeedback(all_output, feedbackReason, feedback_value);
 	}
 })
 
@@ -1598,17 +1522,17 @@ app.get('/feedback', function (req, res) {
 	//console.log(save_data + "=" + parseInt(feedback_value));
 
 	if (save_data && all_output) {
-		recordFeedback(all_output,null,feedback_value);
+		recordFeedback(all_output, null, feedback_value);
 	}
 })
 
-function addFeedbackButton(outputText){
-	outputText +="<br/><b>Please vote on feedback provided.</b>&nbsp;&nbsp;<img src='img/thumbsup-blue.png' class='feedback-img' title='good' onClick='openWindow(1);' />&nbsp;&nbsp;<img src='img/thumbsdown-red.png' class='feedback-img' title='bad' onClick='LogThumbsDown();' /><br/>";
+function addFeedbackButton(outputText) {
+	outputText += "<br/><b>Please vote on feedback provided.</b>&nbsp;&nbsp;<img src='img/thumbsup-blue.png' class='feedback-img' title='good' onClick='openWindow(1);' />&nbsp;&nbsp;<img src='img/thumbsdown-red.png' class='feedback-img' title='bad' onClick='LogThumbsDown();' /><br/>";
 	return outputText;
 }
 
-function recordFeedback(all_output,feedbackReason,feedback_value) {
-	console.log("feedbackReason =>"+JSON.stringify(feedbackReason));
+function recordFeedback(all_output, feedbackReason, feedback_value) {
+	console.log("feedbackReason =>" + JSON.stringify(feedbackReason));
 	var input_text = all_output.input.text;
 	if (input_text) {
 		input_text = input_text;
@@ -1624,20 +1548,20 @@ function recordFeedback(all_output,feedbackReason,feedback_value) {
 	} else {
 		lastOutputText = striptags(lastOutputText);
 	}
-	
+
 
 	var intents = all_output.intents;
 	var intent = null;
 	if (intents[0] != null) {
 		intent = intents[0].intent;
-	} 
+	}
 
 	var entities = all_output.entities;
 	var entity = null;
 	if (entities[0] != null) {
-		
+
 		entity = entities[0].entity;
-	} 
+	}
 	var feeds = feedback_value;
 	if (all_output.context.cxt_user_full_name != null) {
 		userFullName = all_output.context.cxt_user_full_name;
@@ -1645,11 +1569,11 @@ function recordFeedback(all_output,feedbackReason,feedback_value) {
 	if (intent != null) {
 		lastUsedIntent = intent;
 	}
-	if (entity != null){
+	if (entity != null) {
 		lastUsedEntity = entity;
 	}
-	console.log("last used intent"+JSON.stringify(lastUsedIntent));
-	var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','"+all_output.context.conversation_id+"',"+feedbackReason+");";
+	console.log("last used intent" + JSON.stringify(lastUsedIntent));
+	var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','" + all_output.context.conversation_id + "'," + feedbackReason + ");";
 	//console.log("query insert feedback =>" + feedback_sql);
 	var output = executeQuerySync(feedback_sql);
 	if (output.success) {
@@ -1679,8 +1603,8 @@ function recordResponseTime(response) {
 		//console.log("query insert feedback =>" + feedback_sql);
 		var output = executeQuerySync(feedback_sql);
 	}
-	
-	
+
+
 
 }
 
@@ -1699,10 +1623,10 @@ function updateMessage(input, response) {
 		} else {
 			//return response;
 		}
-	console.log("response =>" + JSON.stringify(response));
-	//console.log("outputText=>"+outputText);
+		//console.log("response =>" + JSON.stringify(response));
+		//console.log("outputText=>"+outputText);
 		if (outputText != null) {
-			
+
 			response.output.text = outputText;
 			lastOutputText = outputText;
 			recordResponseTime(response); // record time for every conversation message to get time of chat for one intent.
@@ -1711,5 +1635,38 @@ function updateMessage(input, response) {
 	//outputText = null;
 	return response;
 }
+
+function getOracleDBConnection(oracleConnectionString) {
+	try {
+		var connection = await(oracledb.getConnection(oracleConnectionString, defer()));
+	} catch (err) {
+		//TODO Handle error
+		console.log("error=>" + JSON.stringify(err.message));
+	}
+	return connection;
+}
+
+function getOracleQueryResult(connection, sql) {
+	try {
+		var result = await(connection.execute(sql, [], { outFormat: oracledb.OBJECT }, defer()));
+	}
+	catch (err) {
+		//TODO Handle error
+		doRelease(connection);
+		console.log("error=>" + JSON.stringify(err.message));
+	}
+	return result;
+}
+
+
+
+function doRelease(connection) {
+	connection.close(
+		function (err) {
+			if (err) { console.error(err.message); }
+		});
+}
+
+
 
 module.exports = app;
