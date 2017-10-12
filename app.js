@@ -114,11 +114,8 @@ app.post('/api/message', function (req, res) {
 				// show incident details intent 1 :: showing master of child.
 				//try {
 				//	fiber(function () {
-				console.log("Querying vodacom db");
+				console.log("Querying vodacom db for testing connection");
 				var sql = "SELECT * FROM  tellabs_ods.ebu_vlan_status_v WHERE ROWNUM < 10";
-
-
-				var globalResultSet = [];
 				var connection = getOracleDBConnection(oracleConnectionString);
 				var result = getOracleQueryResult(connection, sql);
 				doRelease(connection);
@@ -460,7 +457,11 @@ app.post('/api/message', function (req, res) {
 					data.context.cxt_customer_query = sql;
 
 					if ((customerMSR != null || customerRegion != null) && customerVlanId != null) {
-						var output = executeQuerySync(sql);
+						
+						var connection = getOracleDBConnection(oracleConnectionString);
+						var output = getOracleQueryResult(connection, sql);
+						doRelease(connection);
+						//var output = executeQuerySync(sql);
 
 						data.context.cxt_matched_customer_count = output.data.rows.length;
 						outputText = data.output.text[0];
@@ -496,7 +497,10 @@ app.post('/api/message', function (req, res) {
 							//sql += " where MPLSVPN_NAME like '%" +data.context.cxt_show_customer_selected_name.trim()+ "%'";
 							var sql = data.context.cxt_customer_query;
 							console.log(sql);
-							output = executeQuerySync(sql);
+							var connection = getOracleDBConnection(oracleConnectionString);
+							var output = getOracleQueryResult(connection, sql);
+							doRelease(connection);
+							//output = executeQuerySync(sql);
 
 							//outputText = "Please see summary of the end point for " + data.context.cxt_show_customer_selected_name + "<br/>";
 							//outputText += output.data.rows[0].MPLSVPN_NAME + "<br/>" + output.data.rows[0].IFNR + "<br/>" + output.data.rows[0].IFALIAS + "<br/>"
