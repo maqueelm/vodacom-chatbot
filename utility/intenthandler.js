@@ -1,8 +1,14 @@
 module.exports = function () {
 
-    /*
-    Handling Intent Logic for Vodacom chat bot
-    */
+    var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
+    var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as parent_incident_number,inc.SPE_FLD_ALARMEVENTSTARTTIME as incident_event_start_time,"+
+                                        "inc.SPE_FLD_ALARMEVENTENDTIME as incident_event_end_time,inc.ACTUAL_START_DATE as task_actual_start_date, inc.ACTUAL_END_DATE as task_actual_end_date,"+
+                                        "inc.SPE_FLD_ACTUALIMPACT as impact,inc.REGION,inc.HPD_CI as site_name,inc.DESCRIPTION as summary,decode(inc.status,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.status) as INC_STATUS,inc.ASSIGNED_GROUP as assigned_group,"+
+                                        "inc.ASSIGNEE,inc.ASSIGNEE_GROUP as task_assignee_group,inc.ASSIGNEE_ID as task_assignee,inc.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2"+
+                                        "inc.RESOLUTION_CATEGORY_TIER_3 as resolution_category_tier_3,inc.GENERIC_CATEGORIZATION_TIER_1 as cause_tier_1,inc.GENERIC_CATEGORIZATION_TIER_2 as cause_tier_2 ";
+                                        
+    //Handling Intent Logic for Vodacom chat bot
+    
     var S = require('string');
     this.handleSitesIntent = function (data, inputText, outputText) {
         console.log("handleSitesIntent");
@@ -27,7 +33,7 @@ module.exports = function () {
             console.log("data.context.cxt_ci_flow_show_incident=>" + data.context.cxt_ci_flow_show_incident);
             if (data.context.cxt_ci_site_name_found_in_db && data.context.cxt_ci_flow_show_incident) {
                 var childCount = 0;
-                var incidentSql = "Select * from incidents where site_name like '%" + data.context.cxt_ci_flow_site_name + "%'";
+                var incidentSql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where inc.HPD_CI like '%" + data.context.cxt_ci_flow_site_name + "%'";
                 var incidentResult = executeQuerySync(incidentSql);
                 outputText = showIncidentsForSiteName(incidentResult.data.rows, outputText, data, conversationId);
                 data.context.cxt_ci_site_name_found_in_db = false;
@@ -58,7 +64,7 @@ module.exports = function () {
             if (tier_cause_search_term != null) {
 
                 data.context.cxt_tx_name = tier_cause_search_term;
-                sql = "Select distinct incident_number,cause_tier_1,count(*) as incidentCount from incidents where cause_tier_1 like '" + tier_cause_search_term + "' and Lower(status) != 'closed';";
+                sql = "Select distinct "+incidentTableFieldsWithAlias+",count(*) as incidentCount from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + tier_cause_search_term + "' and inc.STATUS not in (5,6);";
                 console.log(sql);
                 output = executeQuerySync(sql);
             }
@@ -158,7 +164,7 @@ module.exports = function () {
                     var regionName_2 = S(regionName_1).replaceAll('Africa', "").s;
                     regionName_2 = S(regionName_2).replaceAll('africa', "").s;
                     regionName_2 = S(regionName_2).s;
-                    var sql = "Select distinct(incident_number),count(*) as incidentCount,region,parent_incident_number from incidents where region like '%" + regionName_1 + "%' and LOWER(status) != 'closed' order by parent_incident_number desc ;";
+                    var sql = "Select distinct(inc.incident_number),count(*) as incidentCount,"+incidentTableFieldsWithAlias+" from "+incidentTableName+" where inc.REGION like '%" + regionName_1 + "%' and inc.STATUS not in (5,6) order by parent_incident_number desc ;";
                     console.log("get incidents details for region =>" + sql);
                     //var output = executeQuerySync(sql);
                     var connection = getOracleDBConnection(oracleConnectionString, sync);
@@ -228,11 +234,11 @@ module.exports = function () {
                     var incident_no_str = incidentNumber;
                     incidentNumber = S(incidentNumber).replaceAll('INC', '').s;
                     incidentNumber = S(incidentNumber).replaceAll('inc', '').s;
-                    var sql = "Select * from incidents where incident_number like '%" + incidentNumber + "%';";
+                    var sql = "Select * from "+incidentTableName+" where inc.INCIDENT_NUMBER  like '%" + incidentNumber + "%';";
                     console.log(sql);
                     var output = executeQuerySync(sql);
 
-                    var childsql = "Select count(*) as incidentCount from incidents where parent_incident_number like '%" + incidentNumber + "%';";
+                    var childsql = "Select count(*) as incidentCount from "+incidentTableName+" where inc.ORIGINAL_INCIDENT_NUMBER  like '%" + incidentNumber + "%';";
                     var childoutput = executeQuerySync(childsql);
                     var childCount = 0;
 

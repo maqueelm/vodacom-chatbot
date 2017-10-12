@@ -2,6 +2,13 @@ module.exports = function () {
 var excelbuilder = require('msexcel-builder');
 var S = require('string');
 var excelGenerationRecordCountLimit = 10;
+var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
+var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
+var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as parent_incident_number,inc.SPE_FLD_ALARMEVENTSTARTTIME as incident_event_start_time,"+
+"inc.SPE_FLD_ALARMEVENTENDTIME as incident_event_end_time,inc.ACTUAL_START_DATE as task_actual_start_date, inc.ACTUAL_END_DATE as task_actual_end_date,"+
+"inc.SPE_FLD_ACTUALIMPACT as impact,inc.REGION,inc.HPD_CI as site_name,inc.DESCRIPTION as summary,decode(inc.status,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.status) as INC_STATUS,inc.ASSIGNED_GROUP as assigned_group,"+
+"inc.ASSIGNEE,inc.ASSIGNEE_GROUP as task_assignee_group,inc.ASSIGNEE_ID as task_assignee,inc.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2"+
+"inc.RESOLUTION_CATEGORY_TIER_3 as resolution_category_tier_3,inc.GENERIC_CATEGORIZATION_TIER_1 as cause_tier_1,inc.GENERIC_CATEGORIZATION_TIER_2 as cause_tier_2 ";
 /*
 	Orchestration Layer Methods 
 */
@@ -16,13 +23,13 @@ var excelGenerationRecordCountLimit = 10;
 		outputText = S(outputText).replaceAll('[impact]', dbQueryResult[0].impact).s;
 		outputText = S(outputText).replaceAll('[region]', dbQueryResult[0].region).s;
 		outputText = S(outputText).replaceAll('[site_name]', dbQueryResult[0].site_name).s;
-		outputText = S(outputText).replaceAll('[status]', dbQueryResult[0].status).s;
+		outputText = S(outputText).replaceAll('[status]', dbQueryResult[0].INC_STATUS).s;
 		outputText = S(outputText).replaceAll('[assigned_to]', dbQueryResult[0].assigned_group).s;
 		outputText = S(outputText).replaceAll('[incident_summary]', dbQueryResult[0].summary).s;
 		outputText = S(outputText).replaceAll('[task_assignee_group]', dbQueryResult[0].task_assignee_group).s;
 		outputText = S(outputText).replaceAll('[task_assignee]', dbQueryResult[0].task_assignee).s;
 		console.log("Output after replace =>" + outputText);
-		if (dbQueryResult[0].status.toLowerCase() == 'closed') {
+		if (dbQueryResult[0].INC_STATUS.toLowerCase() == 'closed') {
 
 			outputText += "<br/><b>Incident Event Start:</b> <i>" + dbQueryResult[0].incident_event_start_time + "</i> <br/> <b>Incident Event Closed:</b> <i>" + dbQueryResult[0].incident_event_end_time + "</i>.";
 			outputText += "<br/><b>Cause: </b>" + dbQueryResult[0].cause_tier_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].resolution_category_tier_3 + "";
@@ -69,7 +76,7 @@ var excelGenerationRecordCountLimit = 10;
 	outputText_new = S(outputText_new).replaceAll('[task_assignee_group]', dbQueryResult[0].task_assignee_group).s;
 	outputText_new = S(outputText_new).replaceAll('[task_assignee]', dbQueryResult[0].task_assignee).s;
 
-	if (dbQueryResult[0].status.toLowerCase() == 'closed') {
+	if (dbQueryResult[0].INC_STATUS.toLowerCase() == 'closed') {
 		outputText_new += "<br/><b>Incident Event Start:</b> <i>" + dbQueryResult[0].incident_event_start_time + "</i> <br/> <b>Incident Event Closed:</b> <i>" + dbQueryResult[0].incident_event_end_time + "</i>.";
 		outputText_new += "<br/><b>Cause: </b>" + dbQueryResult[0].cause_tier_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].resolution_category_tier_3 + "";
 	}
@@ -100,7 +107,7 @@ var excelGenerationRecordCountLimit = 10;
 			if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 				break;
 			}
-			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].status + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
 
 		}
 		outputText_new += "</table><br/>";
@@ -127,14 +134,14 @@ var excelGenerationRecordCountLimit = 10;
 		outputText = S(outputText).replaceAll('[impact]', dbQueryResult[0].impact).s;
 		outputText = S(outputText).replaceAll('[region]', dbQueryResult[0].region).s;
 		outputText = S(outputText).replaceAll('[site_name]', dbQueryResult[0].site_name).s;
-		outputText = S(outputText).replaceAll('[status]', dbQueryResult[0].status).s;
+		outputText = S(outputText).replaceAll('[status]', dbQueryResult[0].INC_STATUS).s;
 		outputText = S(outputText).replaceAll('[assigned_to]', dbQueryResult[0].assigned_group).s;
 		outputText = S(outputText).replaceAll('[incident_summary]', dbQueryResult[0].summary).s;
 		outputText = S(outputText).replaceAll('[task_assignee_group]', dbQueryResult[0].task_assignee_group).s;
 		outputText = S(outputText).replaceAll('[task_assignee]', dbQueryResult[0].task_assignee).s;
 		console.log("Output after replace =>" + outputText);
 		outputText += "<br/><i><b>Incident Event Start:</b> <i>" + dbQueryResult[0].incident_event_start_time;
-		if (dbQueryResult[0].status.toLowerCase() == 'closed') {
+		if (dbQueryResult[0].INC_STATUS.toLowerCase() == 'closed') {
 
 			outputText += "<br/><b>Incident Event Closed:</b> <i>" + dbQueryResult[0].incident_event_end_time + "</i>.";
 			outputText += "<br/><b>Cause: </b>" + dbQueryResult[0].cause_tier_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].resolution_category_tier_3 + "";
@@ -175,13 +182,13 @@ var excelGenerationRecordCountLimit = 10;
 	var childIncidentCount = 0;
 	if (dbQueryResult != null) {
 
-		var masterIncidentCountsql = "Select distinct(incident_number),count(*) as masterCount from incidents where region like '%" + regionName_2 + "%' and parent_incident_number is null and LOWER(status) != 'closed';";
+		var masterIncidentCountsql = "Select distinct(inc.incident_number),count(*) as masterCount from "+incidentTableName+" where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER  is null and and inc.STATUS not in (5,6);";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
 		var masterIncidentCountResult = executeQuerySync(masterIncidentCountsql);
 
 		masterIncidentCount = masterIncidentCountResult.data.rows[0].masterCount;
 
-		var childIncidentCountsql = "Select count(*) as childCount from incidents i inner join incidents i2 on (i.parent_incident_number = i2.incident_number) where i.region like '%" + regionName_2 + "%' and i.parent_incident_number is not null and LOWER(i.status) != 'closed' and LOWER(i2.status) != 'closed'";
+		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.parent_incident_number = inc_2.incident_number) where inc.region like '%" + regionName_2 + "%' and inc.parent_incident_number is not null and inc.STATUS not in (5,6) and LOWER(inc_2.STATUS) not in (5,6)";
 		console.log("childIncidentCountsql =>" + childIncidentCountsql);
 		var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
 		childIncidentCount = childIncidentCountResult.data.rows[0].childCount;
@@ -266,7 +273,7 @@ var excelGenerationRecordCountLimit = 10;
 			if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 				break;
 			}
-			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].status + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
 
 		}
 		outputText_new += "</table><br/>";
@@ -300,7 +307,7 @@ var excelGenerationRecordCountLimit = 10;
 				if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 					break;
 				}
-				outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].status + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].region + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+				outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].region + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
 
 			}
 			outputText_new += "</table><br/>";
@@ -336,7 +343,7 @@ var excelGenerationRecordCountLimit = 10;
 				if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 					break;
 				}
-				outputText_new += "<tr><td>" + dbQueryResult[i].count + "</td><td>" + dbQueryResult[i].parent_incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].status + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+				outputText_new += "<tr><td>" + dbQueryResult[i].count + "</td><td>" + dbQueryResult[i].parent_incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
 
 			}
 			outputText_new += "</table><br/>";
@@ -374,7 +381,7 @@ var excelGenerationRecordCountLimit = 10;
 			if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 				break;
 			}
-			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].status + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
 
 		}
 		outputText_new += "</table><br/>";
@@ -408,7 +415,7 @@ var excelGenerationRecordCountLimit = 10;
 		outputText_new += "<tr><th>INCIDENT NUMBER</th><th>DESCRIPTION</th><th>STATUS</th><th>SITE NAME</th></tr>";
 		for (i = 0; i < dbQueryResult.length; i++) {
 
-			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].status + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
 
 		}
 		outputText_new += "</table><br/>";
@@ -446,14 +453,14 @@ var excelGenerationRecordCountLimit = 10;
 	if (dbQueryResult != null) {
 		data.context.cxt_tx_found_incident_count = dbQueryResult[0].incidentCount;
 		var cause_tier_1 = data.context.cxt_tx_name;
-		var masterIncidentCountsql = "Select count(*) as masterCount from incidents where cause_tier_1 like '" + cause_tier_1 + "' and parent_incident_number is null and LOWER(status) != 'closed';";
+		var masterIncidentCountsql = "Select count(*) as masterCount from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and ORIGINAL_INCIDENT_NUMBER is null and inc.STATUS not in (5,6);";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
 		var masterIncidentCountResult = executeQuerySync(masterIncidentCountsql);
 
 		masterIncidentCount = masterIncidentCountResult.data.rows[0].masterCount;
 
 		//var childIncidentCountsql = "Select count(*) as childCount from incidents where cause_tier_1 like '" + cause_tier_1 + "' and parent_incident_number is not null and LOWER(status) != 'closed'";
-		var childIncidentCountsql = "Select count(*) as childCount from incidents i inner join incidents i2 on (i.parent_incident_number = i2.incident_number) where i.cause_tier_1 like '" + cause_tier_1 + "' and i2.cause_tier_1 like '" + cause_tier_1 + "' and i.parent_incident_number is not null and LOWER(i.status) != 'closed' and LOWER(i2.status) != 'closed'";
+		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inc inner join "+incidentTableName_2+" on (inc.parent_incident_number = inc_2.incident_number) where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and inc_2.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and i.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
 		console.log("childIncidentCountsql =>" + childIncidentCountsql);
 		var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
 		childIncidentCount = childIncidentCountResult.data.rows[0].childCount;
@@ -499,48 +506,48 @@ var excelGenerationRecordCountLimit = 10;
  }
 
  this.buildExcelSheet = function buildExcelSheet(excelSheetName, dbQueryResult, noOfColumns) {
-    
-        // Create a new workbook file in current working-path 
-        var workbook = excelbuilder.createWorkbook('./', excelSheetName)
-    
-        // Create a new worksheet with 10 columns and 12 rows 
-        var numberOfRows = dbQueryResult.length;
-        var sheet1 = workbook.createSheet('data', noOfColumns, Number(numberOfRows) + Number(1));
-    
-        // Fill some data 
-        sheet1.set(1, 1, 'Incident Number');
-        sheet1.set(2, 1, 'Description');
-        sheet1.set(3, 1, 'Status');
-        sheet1.set(4, 1, 'Site Name');
-        var j = 0;
-        var numberOfRowsNew = Number(numberOfRows) + Number(2);
-    
-        for (var i = 2; i < numberOfRowsNew; i++) {
-            //sheet1.set(col, row, data);
-            //console.log(i);
-            sheet1.set(1, i, dbQueryResult[j].incident_number);
-            sheet1.set(2, i, dbQueryResult[j].summary);
-            sheet1.set(3, i, dbQueryResult[j].status);
-            sheet1.set(4, i, dbQueryResult[j].site_name);
-            if (j == numberOfRows) {
-                break;
-            } else {
-                j++;
-            }
-        }
-    
-        // Save it 
-        workbook.save(function (ok) {
-            if (!ok)
-                workbook.cancel();
-            else
-                console.log('congratulations, your workbook created');
-        });
-    
-    
-    
-    
-    }
+
+	// Create a new workbook file in current working-path 
+	var workbook = excelbuilder.createWorkbook('./', excelSheetName)
+
+	// Create a new worksheet with 10 columns and 12 rows 
+	var numberOfRows = dbQueryResult.length;
+	var sheet1 = workbook.createSheet('data', noOfColumns, Number(numberOfRows) + Number(1));
+
+	// Fill some data 
+	sheet1.set(1, 1, 'Incident Number');
+	sheet1.set(2, 1, 'Description');
+	sheet1.set(3, 1, 'Status');
+	sheet1.set(4, 1, 'Site Name');
+	var j = 0;
+	var numberOfRowsNew = Number(numberOfRows) + Number(2);
+
+	for (var i = 2; i < numberOfRowsNew; i++) {
+		//sheet1.set(col, row, data);
+		//console.log(i);
+		sheet1.set(1, i, dbQueryResult[j].incident_number);
+		sheet1.set(2, i, dbQueryResult[j].summary);
+		sheet1.set(3, i, dbQueryResult[j].status);
+		sheet1.set(4, i, dbQueryResult[j].site_name);
+		if (j == numberOfRows) {
+			break;
+		} else {
+			j++;
+		}
+	}
+
+	// Save it 
+	workbook.save(function (ok) {
+		if (!ok)
+			workbook.cancel();
+		else
+			console.log('congratulations, your workbook created');
+	});
+
+
+
+
+}
 
  
 
