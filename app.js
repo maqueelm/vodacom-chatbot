@@ -21,7 +21,6 @@ var syncSql = require('sync-sql');
 var express = require('express'); // app server
 var oracledb = require('oracledb');
 var dbConfig = require('./dbconfig.js');
-var excel = require('./excelGenerator.js');
 var S = require('string');
 var bodyParser = require('body-parser'); // parser for post requests
 var Conversation = require('watson-developer-cloud/conversation/v1'); // watson sdk
@@ -115,13 +114,14 @@ app.post('/api/message', function (req, res) {
 				// show incident details intent 1 :: showing master of child.
 				//try {
 				//	fiber(function () {
-
-				var sql = "SELECT * FROM  incidents WHERE ROWNUM < 10 ORDER BY incident_number";
+				console.log("Querying vodacom db");
+				var sql = "SELECT * FROM  tellabs_ods.ebu_vlan_status_v WHERE ROWNUM < 10";
 
 
 				var globalResultSet = [];
 				var connection = getOracleDBConnection(oracleConnectionString);
 				var result = getOracleQueryResult(connection, sql);
+				doRelease(connection);
 				console.log("resultRows=>" + JSON.stringify(result.rows));
 
 
@@ -430,7 +430,7 @@ app.post('/api/message', function (req, res) {
 						customerRegion = data.context.cxt_customer_location_text;
 					}
 
-					var sql = "Select MPLSVPN_NAME,IFNR,IFALIAS,IFACCURSTRING,NID,NODE_NM from vlan_msr ";
+					var sql = "Select MPLSVPN_NAME,IFNR,IFALIAS,IFACCURSTRING,NID,NODE_NM from tellabs_ods.ebu_vlan_status_v ";
 					if (customerName != null) {
 						sql += " where MPLSVPN_NAME like '%" + customerName + "%'";
 
