@@ -1,16 +1,22 @@
 module.exports = function () {
 
     var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
-    var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as parent_incident_number,inc.SPE_FLD_ALARMEVENTSTARTTIME as incident_event_start_time,"+
-                                        "inc.SPE_FLD_ALARMEVENTENDTIME as incident_event_end_time,inc.ACTUAL_START_DATE as task_actual_start_date, inc.ACTUAL_END_DATE as task_actual_end_date,"+
+    var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
+    var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as parent_incident_number,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as incident_event_start_time,"+
+                                        "TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as incident_event_end_time, "+
                                         "inc.SPE_FLD_ACTUALIMPACT as impact,inc.REGION,inc.HPD_CI as site_name,inc.DESCRIPTION as summary,decode(inc.status,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.status) as INC_STATUS,inc.ASSIGNED_GROUP as assigned_group,"+
-                                        "inc.ASSIGNEE,inc.ASSIGNEE_GROUP as task_assignee_group,inc.ASSIGNEE_ID as task_assignee,inc.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2"+
+                                        "inc.ASSIGNEE,inc.ASSIGNEE_GROUP as task_assignee_group,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2"+
                                         "inc.RESOLUTION_CATEGORY_TIER_3 as resolution_category_tier_3,inc.GENERIC_CATEGORIZATION_TIER_1 as cause_tier_1,inc.GENERIC_CATEGORIZATION_TIER_2 as cause_tier_2 ";
-                                        
+    
+    var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as parent_incident_number,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as incident_event_start_time,"+
+                                        "TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as incident_event_end_time, "+
+                                        "inc.SPE_FLD_ACTUALIMPACT as impact,inc.REGION,inc.HPD_CI as site_name,inc.DESCRIPTION as summary,decode(inc.status,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.status) as INC_STATUS,"+
+                                        "tas.ASSIGNEE_GROUP as task_assignee_group,tas.ASSIGNEE as task_assignee,tas.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2"+
+                                        "inc.RESOLUTION_CATEGORY_TIER_3 as resolution_category_tier_3,inc.GENERIC_CATEGORIZATION_TIER_1 as cause_tier_1,inc.GENERIC_CATEGORIZATION_TIER_2 as cause_tier_2 ";                                    
     //Handling Intent Logic for Vodacom chat bot
     
     var S = require('string');
-    this.handleSitesIntent = function (data, inputText, outputText) {
+    this.handleSitesIntent = function (data, inputText, outputText,sync) {
         console.log("handleSitesIntent");
         if (data.context.cxt_ci_flow_site_name != null) {
             console.log("sites intent context variable checks");
@@ -34,8 +40,11 @@ module.exports = function () {
             if (data.context.cxt_ci_site_name_found_in_db && data.context.cxt_ci_flow_show_incident) {
                 var childCount = 0;
                 var incidentSql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where inc.HPD_CI like '%" + data.context.cxt_ci_flow_site_name + "%'";
-                var incidentResult = executeQuerySync(incidentSql);
-                outputText = showIncidentsForSiteName(incidentResult.data.rows, outputText, data, conversationId);
+                //var incidentResult = executeQuerySync(incidentSql);
+                var connection = getOracleDBConnection(oracleConnectionString, sync);
+                var output = getOracleQueryResult(connection, incidentSql, sync);
+                doRelease(connection);
+                outputText = showIncidentsForSiteName(incidentResult.rows, outputText, data, conversationId);
                 data.context.cxt_ci_site_name_found_in_db = false;
                 data.context.cxt_ci_flow_site_name = null;
             }
@@ -43,7 +52,7 @@ module.exports = function () {
         return outputText;
     }
 
-    this.handleTransmissionFailureIntent = function (data, inputText, outputText) {
+    this.handleTransmissionFailureIntent = function (data, inputText, outputText,sync) {
 
         if (data != null && data.intents[0] != null && data.intents[0].intent == "tier-cause-transmission-failure" || (data != null && data.entities[0] != null && data.entities[0].entity == "transmission-failures")) {
 
@@ -66,13 +75,16 @@ module.exports = function () {
                 data.context.cxt_tx_name = tier_cause_search_term;
                 sql = "Select distinct "+incidentTableFieldsWithAlias+",count(*) as incidentCount from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + tier_cause_search_term + "' and inc.STATUS not in (5,6);";
                 console.log(sql);
-                output = executeQuerySync(sql);
+                //output = executeQuerySync(sql);
+                var connection = getOracleDBConnection(oracleConnectionString, sync);
+                output = getOracleQueryResult(connection, sql, sync);
+                doRelease(connection);
             }
 
             if (output != null) {
-                if (output.data.rows != null && output.data.rows.length > 0) {
+                if (output.rows != null && output.rows.length > 0) {
 
-                    outputText = orchestrateBotResponseTextForTransmissionFailures(output.data.rows, data.output.text, data);
+                    outputText = orchestrateBotResponseTextForTransmissionFailures(output.rows, data.output.text, data);
                 }
                 if (output.data.rows.length == 0) {
                     //console.log("in not found message.");
@@ -115,7 +127,7 @@ module.exports = function () {
                     var connection = getOracleDBConnection(oracleConnectionString, sync);
                     var output = getOracleQueryResult(connection, sql, sync);
                     doRelease(connection);
-                    outputText = orchestrateBotResponseTextForCustomer(output.data.rows, data.output.text, customerName, data);
+                    outputText = orchestrateBotResponseTextForCustomer(output.rows, data.output.text, customerName, data);
 
                 }
             }
@@ -174,7 +186,7 @@ module.exports = function () {
 
 
                     if (output.data.rows != null && output.data.rows.length >= 1) {
-                        outputText = orchestrateBotResponseTextForRegion(output.data.rows, data.output.text, regionName_1, data);
+                        outputText = orchestrateBotResponseTextForRegion(output.data.rows, data.output.text, regionName_1, data,sync);
                     }
                     if (output.data.rows.length == 0) {
                         if (regionName_1 != null)
@@ -192,7 +204,7 @@ module.exports = function () {
 
     }
 
-    this.handleIncidentIntent = function (data, inputText, outputText, incidentFlow) {
+    this.handleIncidentIntent = function (data, inputText, outputText, incidentFlow,sync) {
 
         var goToIncidentIntent = false;
 
@@ -234,26 +246,31 @@ module.exports = function () {
                     var incident_no_str = incidentNumber;
                     incidentNumber = S(incidentNumber).replaceAll('INC', '').s;
                     incidentNumber = S(incidentNumber).replaceAll('inc', '').s;
-                    var sql = "Select * from "+incidentTableName+" where inc.INCIDENT_NUMBER  like '%" + incidentNumber + "%';";
+                    var sql = "Select "+incidentTableJoinTaskTable+" from "+incidentTableName+" join aradmin.tms_task tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS not in (5,6) and inc.INCIDENT_NUMBER  like '%" + incidentNumber + "%';";
                     console.log(sql);
-                    var output = executeQuerySync(sql);
+                    //var output = executeQuerySync(sql);
+                    var connection = getOracleDBConnection(oracleConnectionString, sync);
+                    var output = getOracleQueryResult(connection, sql, sync);
+                    doRelease(connection);
 
                     var childsql = "Select count(*) as incidentCount from "+incidentTableName+" where inc.ORIGINAL_INCIDENT_NUMBER  like '%" + incidentNumber + "%';";
-                    var childoutput = executeQuerySync(childsql);
+                    //var childoutput = executeQuerySync(childsql);
+                    var connection = getOracleDBConnection(oracleConnectionString, sync);
+                    var childoutput = getOracleQueryResult(connection, childsql, sync);
                     var childCount = 0;
 
-                    if (childoutput != null && childoutput.data.rows != null) {
-                        console.log("child count for incident =>" + childoutput.data.rows[0].incidentCount);
-                        childCount = childoutput.data.rows[0].incidentCount;
+                    if (childoutput != null && childoutput.rows != null) {
+                        console.log("child count for incident =>" + childoutput.rows[0].incidentCount);
+                        childCount = childoutput.rows[0].incidentCount;
                     }
                     //console.log("checking output condition");
                     if (output != null) {
                         //console.log("out put is not null");
-                        if (output.data.rows != null && output.data.rows.length > 0) {
+                        if (output.rows != null && output.rows.length > 0) {
                             console.log("found incident");
-                            outputText = orchestrateBotResponseTextForIncident(output.data.rows, data.output.text, data, childCount);
+                            outputText = orchestrateBotResponseTextForIncident(output.rows, data.output.text, data, childCount);
                         }
-                        if (output.data.rows.length == 0) {
+                        if (output.rows.length == 0) {
                             //console.log("in not found message.");
                             outputText = "<b>Sorry, no result can be found against given incident number " + incident_no_str + ". Please provide with a different incident number.</b>";
                         } else {

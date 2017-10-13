@@ -4,12 +4,11 @@ var S = require('string');
 var excelGenerationRecordCountLimit = 10;
 var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
 var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
-var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as parent_incident_number,inc.SPE_FLD_ALARMEVENTSTARTTIME as incident_event_start_time,"+
-"inc.SPE_FLD_ALARMEVENTENDTIME as incident_event_end_time,inc.ACTUAL_START_DATE as task_actual_start_date, inc.ACTUAL_END_DATE as task_actual_end_date,"+
+var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as parent_incident_number,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as incident_event_start_time,"+
+"TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as incident_event_end_time,"+
 "inc.SPE_FLD_ACTUALIMPACT as impact,inc.REGION,inc.HPD_CI as site_name,inc.DESCRIPTION as summary,decode(inc.status,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.status) as INC_STATUS,inc.ASSIGNED_GROUP as assigned_group,"+
 "inc.ASSIGNEE,inc.ASSIGNEE_GROUP as task_assignee_group,inc.ASSIGNEE_ID as task_assignee,inc.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2"+
 "inc.RESOLUTION_CATEGORY_TIER_3 as resolution_category_tier_3,inc.GENERIC_CATEGORIZATION_TIER_1 as cause_tier_1,inc.GENERIC_CATEGORIZATION_TIER_2 as cause_tier_2 ";
-/*
 	Orchestration Layer Methods 
 */
  this.orchestrateBotResponseTextForSiteName = function (dbQueryResult, outputText, response, childCount) {
@@ -176,7 +175,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 	return outputText;
  }
 
- this.orchestrateBotResponseTextForRegion = function (dbQueryResult, outputText, regionName_2, data) {
+ this.orchestrateBotResponseTextForRegion = function (dbQueryResult, outputText, regionName_2, data,sync) {
     console.log("orchestrateBotResponseTextForRegion = >Length of rows =>" + dbQueryResult.length);
 	var masterIncidentCount = 0;
 	var childIncidentCount = 0;
@@ -184,14 +183,20 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
 		var masterIncidentCountsql = "Select distinct(inc.incident_number),count(*) as masterCount from "+incidentTableName+" where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER  is null and and inc.STATUS not in (5,6);";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
-		var masterIncidentCountResult = executeQuerySync(masterIncidentCountsql);
+        //var masterIncidentCountResult = executeQuerySync(masterIncidentCountsql);
+        var connection = getOracleDBConnection(oracleConnectionString,sync);
+        var masterIncidentCountResult = getOracleQueryResult(connection, masterIncidentCountsql,sync);
+        //doRelease(connection);
 
-		masterIncidentCount = masterIncidentCountResult.data.rows[0].masterCount;
+		masterIncidentCount = masterIncidentCountResult.rows[0].masterCount;
 
-		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.parent_incident_number = inc_2.incident_number) where inc.region like '%" + regionName_2 + "%' and inc.parent_incident_number is not null and inc.STATUS not in (5,6) and LOWER(inc_2.STATUS) not in (5,6)";
-		console.log("childIncidentCountsql =>" + childIncidentCountsql);
-		var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
-		childIncidentCount = childIncidentCountResult.data.rows[0].childCount;
+		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.parent_incident_number = inc_2.incident_number) where inc.region like '%" + regionName_2 + "%' and inc.parent_incident_number is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
+        console.log("childIncidentCountsql =>" + childIncidentCountsql);
+       // var connection = getOracleDBConnection(oracleConnectionString,sync);
+        var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);
+        doRelease(connection);
+		//var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
+		childIncidentCount = childIncidentCountResult.rows[0].childCount;
 
 		var is_are = "is";
 		if (childIncidentCount > 1) {
@@ -218,19 +223,22 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
  }
 
- this.updateSuggestedLocationsInMessage = function (messageText, regionCode) {
+ this.updateSuggestedLocationsInMessage = function (messageText, regionCode,sync) {
     
-    var locationQuery = "SELECT location_name FROM `locations_lookup` where remedy_location_name like '%" + regionCode + "%' limit 10";
+    var locationQuery = "SELECT location_name FROM `locations_lookup` where remedy_location_name like '%" + regionCode + "%' WHERE ROWNUM < 11";
 	console.log("Query for updating locations in message. =>" + locationQuery);
-	var locationsResultSet = executeQuerySync(locationQuery);
+    //var locationsResultSet = executeQuerySync(locationQuery);
+    var connection = getOracleDBConnection(oracleConnectionString, sync);
+    var locationsResultSet = getOracleQueryResult(connection, locationQuery, sync);
+    doRelease(connection);
 	if (messageText == null) {
 		messageText = '';
 	}
-	if (locationsResultSet != null && locationsResultSet.data.rows.length > 0) {
+	if (locationsResultSet != null && locationsResultSet.rows.length > 0) {
 		messageText = "Type the location name. Common Locations are <br/>";
-		for (i = 0; i < locationsResultSet.data.rows.length; i++) {
-			messageText += locationsResultSet.data.rows[i].location_name;
-			if (i < locationsResultSet.data.rows.length - 1)
+		for (i = 0; i < locationsResultSet.rows.length; i++) {
+			messageText += locationsResultSet.rows[i].location_name;
+			if (i < locationsResultSet.rows.length - 1)
 				messageText += ",&nbsp;";
 			if (i > 0 && i % 4 == 0) {
 				messageText += "<br/>";
