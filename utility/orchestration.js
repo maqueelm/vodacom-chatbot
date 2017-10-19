@@ -2,15 +2,15 @@ module.exports = function () {
 var excelbuilder = require('msexcel-builder');
 var S = require('string');
 var excelGenerationRecordCountLimit = 10;
-var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
-var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
+var incidentTableName = "VODACOM.HPD_HELP_DESK inc";
+var incidentTableName_2 = "VODACOM.HPD_HELP_DESK inc_2";
 var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as parent_incident_number,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as incident_event_start_time,"+
 "TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as incident_event_end_time,"+
 "inc.SPE_FLD_ACTUALIMPACT as impact,inc.REGION,inc.HPD_CI as site_name,inc.DESCRIPTION as summary,decode(inc.status,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.status) as INC_STATUS,inc.ASSIGNED_GROUP as assigned_group,"+
-"inc.ASSIGNEE,inc.ASSIGNEE_GROUP as task_assignee_group,inc.ASSIGNEE_ID as task_assignee,inc.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2"+
+"inc.ASSIGNEE,inc.ASSIGNEE_GROUP as task_assignee_group,inc.ASSIGNEE_ID as task_assignee,inc.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2,"+
 "inc.RESOLUTION_CATEGORY_TIER_3 as resolution_category_tier_3,inc.GENERIC_CATEGORIZATION_TIER_1 as cause_tier_1,inc.GENERIC_CATEGORIZATION_TIER_2 as cause_tier_2 ";
-	Orchestration Layer Methods 
-*/
+    
+// Orchestration Layer Methods 
  this.orchestrateBotResponseTextForSiteName = function (dbQueryResult, outputText, response, childCount) {
     console.log("orchestrateBotResponseTextForSiteName = >Length of rows =>" + dbQueryResult.length);
 	//console.log ("Output =>" + outputText);
@@ -151,7 +151,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 			var child_incident_count = childCount;
 			response.context.cxt_child_incident_count = child_incident_count;
 
-			outputText += "<br/><br/> I also found that  <b>" + dbQueryResult[0].incident_number + "</b> is a <b>master</b> incident ";
+			outputText += "<br/> I also found that  <b>" + dbQueryResult[0].incident_number + "</b> is a <b>master</b> incident ";
 			if (childCount > 0) {
 				outputText += "and it has <b>" + child_incident_count + "</b> child incidents, if you like to see these incidents detail, reply with <b>yes</b>.";
 
@@ -163,7 +163,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 		} else {
 			response.context.cxt_is_master_incident = false;
 			response.context.cxt_parent_incident_number = dbQueryResult[0].parent_incident_number;
-			outputText += "<br/><br/> I found that " + dbQueryResult[0].incident_number + " child of master incident " + dbQueryResult[0].parent_incident_number + ". if you like to see the detail of master incident, reply with <b>yes</b>.";
+			outputText += "<br/> I found that " + dbQueryResult[0].incident_number + " child of master incident " + dbQueryResult[0].parent_incident_number + ". if you like to see the detail of master incident, reply with <b>yes</b>.";
 
 		}
 
@@ -184,7 +184,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 		var masterIncidentCountsql = "Select distinct(inc.incident_number),count(*) as masterCount from "+incidentTableName+" where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER  is null and and inc.STATUS not in (5,6);";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
         //var masterIncidentCountResult = executeQuerySync(masterIncidentCountsql);
-        var connection = getOracleDBConnection(oracleConnectionString,sync);
+        var connection = getOracleDBConnection(sync);
         var masterIncidentCountResult = getOracleQueryResult(connection, masterIncidentCountsql,sync);
         //doRelease(connection);
 
@@ -192,7 +192,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
 		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.parent_incident_number = inc_2.incident_number) where inc.region like '%" + regionName_2 + "%' and inc.parent_incident_number is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
         console.log("childIncidentCountsql =>" + childIncidentCountsql);
-       // var connection = getOracleDBConnection(oracleConnectionString,sync);
+       // var connection = getOracleDBConnection(sync);
         var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);
         doRelease(connection);
 		//var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
@@ -225,10 +225,12 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
  this.updateSuggestedLocationsInMessage = function (messageText, regionCode,sync) {
     
-    var locationQuery = "SELECT location_name FROM `locations_lookup` where remedy_location_name like '%" + regionCode + "%' WHERE ROWNUM < 11";
+    //var locationQuery = "SELECT location_name FROM `locations_lookup` where remedy_location_name like '%" + regionCode + "%' WHERE ROWNUM < 11";
+    var locationQuery = "SELECT l.object_key as location_key, l.name as location_name, l.atoll_id, l.remedy_name as remedy_location_name, n.OBJECT_CLASS, n.OBJECT_KEY, n.NAME CI_NAME, n.NODE_STATUS, n.PARENT_NODE, n.REMEDY_STATUS, n.REMEDY_ID"+
+                         " FROM name_repo.node_v n JOIN name_repo.site_v l ON n.site = l.object_key WHERE ROWNUM < 11 and n.NODE_STATUS = 'In Service' and l.remedy_name like '%" + regionCode + "%' ";
 	console.log("Query for updating locations in message. =>" + locationQuery);
     //var locationsResultSet = executeQuerySync(locationQuery);
-    var connection = getOracleDBConnection(oracleConnectionString, sync);
+    var connection = getOracleDBConnection( sync);
     var locationsResultSet = getOracleQueryResult(connection, locationQuery, sync);
     doRelease(connection);
 	if (messageText == null) {

@@ -1,6 +1,12 @@
 module.exports = function() { 
     var oracledb = require('oracledb');
-    this.getOracleDBConnection = function (oracleConnectionString,sync) {
+    var dbConfig = require('./dbconfig.js');
+    var oracleConnectionString = {
+        user: dbConfig.user,
+        password: dbConfig.password,
+        connectString: dbConfig.connectString
+    };
+    this.getOracleDBConnection = function (sync) {
         try {
             var connection = sync.await(oracledb.getConnection(oracleConnectionString, sync.defer()));
         } catch (err) {
