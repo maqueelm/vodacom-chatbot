@@ -3,6 +3,7 @@ module.exports = function () {
     //Handling Intent Logic for Vodacom chat bot
     
     var S = require('string');
+    var striptags = require('striptags');
     this.handleSitesIntent = function (data, inputText, outputText) {
         console.log("handleSitesIntent");
         if (data.context.cxt_ci_flow_site_name != null) {
@@ -284,7 +285,7 @@ module.exports = function () {
             return outputText;
     }
 
-    this.handleEscalationIntent = function (data, inputText, outputText) {
+    this.handleEscalationIntent = function (data, inputText, outputText,await,defer,discovery) {
 
         if (data != null && data.intents[0] != null && data.intents[0].intent == "escalation" && data.intents[0].confidence > 0.5 || (data.entities[0] != null && data.entities[0] == 'escalation')) {
             console.log("handleEscalationIntent");

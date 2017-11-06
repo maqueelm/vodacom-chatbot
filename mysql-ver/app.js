@@ -557,7 +557,7 @@ app.post('/api/message', function (req, res) {
 					/*
 					Escalation Intent Handling.
 					*/
-					outputText = handleEscalationIntent(data, inputText, outputText);
+					outputText = handleEscalationIntent(data, inputText, outputText,await,defer,discovery);
 
 
 					//console.log("replacing location name in message if there are any.");
