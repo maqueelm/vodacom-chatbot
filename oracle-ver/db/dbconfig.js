@@ -88,4 +88,4 @@ module.exports = {
   externalAuth  : process.env.NODE_ORACLEDB_EXTERNALAUTH ? true : false
 };
 
-// yes, remedy is 10.132.27.158 and vodanetworks is 10.132.33.221
+// yes, remedy is 10.132.27.158 (qrem001zafsrh.vodacom.corp) and vodanetworks is 10.132.33.221 (vodanetworks.vodacom.co.za)

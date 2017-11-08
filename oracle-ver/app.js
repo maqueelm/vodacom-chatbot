@@ -45,11 +45,10 @@ var oracleConnectionString = {
 
 var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
 var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
-var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as parent_incident_number,inc.SPE_FLD_ALARMEVENTSTARTTIME as incident_event_start_time,"+
-									"inc.SPE_FLD_ALARMEVENTENDTIME as incident_event_end_time,inc.ACTUAL_START_DATE as task_actual_start_date, inc.ACTUAL_END_DATE as task_actual_end_date,"+
-									"inc.SPE_FLD_ACTUALIMPACT as impact,inc.REGION,inc.HPD_CI as site_name,inc.DESCRIPTION as summary,decode(inc.status,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.status) as INC_STATUS,inc.ASSIGNED_GROUP as assigned_group,"+
-									"inc.ASSIGNEE,inc.ASSIGNEE_GROUP as task_assignee_group,inc.ASSIGNEE_ID as task_assignee,inc.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2,"+
-									"inc.RESOLUTION_CATEGORY_TIER_3 as resolution_category_tier_3,inc.GENERIC_CATEGORIZATION_TIER_1 as cause_tier_1,inc.GENERIC_CATEGORIZATION_TIER_2 as cause_tier_2 ";
+var taskTable = "ARADMIN.TMS_TASK";
+var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,inc.RESOLUTION_CATEGORY_TIER_2 as RESOLUTION_CATEGORY_TIER_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";
+
+var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,inc.ASSIGNEE,inc.ASSIGNED_GROUP,tas.ASSIGNEE_GROUP as TASK_ASSIGNEE_GROUP,tas.ASSIGNEE as TASK_ASSIGNEE,tas.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";
 
 var fiber = sync.fiber;
 var await = sync.await;
@@ -105,22 +104,28 @@ app.post('/api/message', function (req, res) {
 				}
 				outputText = null;
 				conversationId = payload.context.conversation_id;
-
-
 				
-
+				//var incident_query = "select ASSIGNEE,ASSIGNED_GROUP from "+incidentTableName+" where incident_number = 'INC000008400003' and ROWNUM = 1";
+				//console.log(incident_query);
+				//var connection = getOracleDBConnectionRemedy(sync);
+				//console.log(connection);
+				//var incidentoutput = getOracleQueryResult(connection, incident_query, sync);
+				//console.log(JSON.stringify(incidentoutput));
 
 				if (data != null && data.context.cxt_show_incident_details != null && data.context.cxt_show_incident_details == true && data.context.cxt_incident_number != null && data.context.cxt_incident_number != -1 && data.context.cxt_is_master_incident != null && data.context.cxt_is_master_incident) {
 
 					//console.log("data.context.cxt_parent_incident_number =>" + data.context.cxt_incident_number);
 					//console.log("data.context.cxt_show_incident_details =>" + data.context.cxt_show_incident_details);
 					//console.log("data.context.cxt_show_anything_else_msg =>" + data.context.cxt_show_anything_else_msg);
-					var childsql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where ORIGINAL_INCIDENT_NUMBER = '" + data.context.cxt_incident_number + "';";
+					var childsql = "Select "+incidentTableJoinTaskTable+" from "+incidentTableName+" join "+taskTable+" tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS not in (5,6) and inc.ORIGINAL_INCIDENT_NUMBER  like '%" + data.context.cxt_incident_number + "%'";
+					
+					//"Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where ORIGINAL_INCIDENT_NUMBER = '" + data.context.cxt_incident_number + "'";
+					
 					console.log("query from context variable =>" + childsql);
 					//var childoutput = executeQuerySync(childsql);
 					var connection = getOracleDBConnectionRemedy(sync);
 					var childoutput = getOracleQueryResult(connection, childsql,sync);
-					//// doRelease(connection);
+					doRelease(connection);
 					outputText = showChildIncidents(childoutput.rows, outputText, data, conversationId);
 					data.context.cxt_show_incident_details = false;
 					data.context.cxt_show_anything_else_msg = true;
@@ -134,12 +139,13 @@ app.post('/api/message', function (req, res) {
 					//console.log("data.context.cxt_show_incident_details =>"+ data.context.cxt_show_incident_details);
 					//console.log("data.context.cxt_show_anything_else_msg =>"+ data.context.cxt_show_anything_else_msg);
 
-					var childsql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where inc.incident_number = '" + data.context.cxt_parent_incident_number + "';";
+					//var childsql = "Select "+incidentTableJoinTaskTable+" from "+incidentTableName+" where inc.INCIDENT_NUMBER = '" + data.context.cxt_parent_incident_number + "'";
+					var childsql = "Select "+incidentTableJoinTaskTable+" from "+incidentTableName+" join "+taskTable+" tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS not in (5,6) and inc.INCIDENT_NUMBER  like '%" + data.context.cxt_parent_incident_number + "%'";
 					console.log("query from context variable =>" + childsql);
 					//var childoutput = executeQuerySync(childsql);
 					var connection = getOracleDBConnectionRemedy(sync);
 					var childoutput = getOracleQueryResult(connection, childsql,sync);
-					//// doRelease(connection);
+					doRelease(connection);
 					outputText = showParentIncidentDetails(childoutput.rows, outputText, data);
 					data.context.cxt_show_anything_else_msg = true;
 					data.context.cxt_show_incident_details = false;
@@ -161,22 +167,22 @@ app.post('/api/message', function (req, res) {
 					if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows[0] != null) {
 						customerRegion = lookupResult.data.rows[0].full_name;
 					}
-					var childsql = "Select count(inc.incident_number) as count ,inc_2.status,inc.parent_incident_number,inc_2.site_name,inc_2.summary,inc_2.region from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.parent_incident_number = inc_2.incident_number) where inc.region like '%" + customerRegion + "%' and inc.parent_incident_number is not null and inc.status not in (5,6) and inc_2.status not in (5,6) group by i.ORIGINAL_INCIDENT_NUMBER	order by count desc";
+					var childsql = "Select count(inc.INCIDENT_NUMBER) as count ,inc_2.STATUS,inc.PARENT_INCIDENT_NUMBER,inc_2.HPD_CI AS SITE_NAME,inc_2.DESCRIPTION AS SUMMARY,inc_2.REGION from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.PARENT_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.region like '%" + customerRegion + "%' and inc.PARENT_INCIDENT_NUMBER is not null and inc.status not in (5,6) and inc_2.status not in (5,6) group by i.ORIGINAL_INCIDENT_NUMBER	order by count desc";
 					console.log("query to get Master Incident from context variable =>" + childsql);
 					//var masterIncidentsDetailsResult = executeQuerySync(childsql);
 					var connection = getOracleDBConnectionRemedy(sync);
 					var masterIncidentsDetailsResult = getOracleQueryResult(connection, childsql,sync);
-					//// doRelease(connection);
+					doRelease(connection);
 					
 					console.log(masterIncidentsDetailsResult.data.rows.length);
 					// if no master found with child association list all masters that are found for the region.
 					if (masterIncidentsDetailsResult.rows.length == 0) {
-						childsql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where inc.region like '%" + customerRegion + "%' and inc.parent_incident_number is null and inc.status not in (5,6)";
+						childsql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where inc.region like '%" + customerRegion + "%' and inc.PARENT_INCIDENT_NUMBER is null and inc.status not in (5,6)";
 						console.log("query to get Master Incident from context variable =>" + childsql);
 						//masterIncidentsDetailsResult = executeQuerySync(childsql);
 						var connection = getOracleDBConnectionRemedy(sync);
 						masterIncidentsDetailsResult = getOracleQueryResult(connection, childsql,sync);
-						//// doRelease(connection);
+						doRelease(connection);
 						outputText = DisplyDetailsForMasterIncidents(masterIncidentsDetailsResult.rows, outputText, data, conversationId);
 
 					} else {
@@ -197,14 +203,14 @@ app.post('/api/message', function (req, res) {
 						//var listOfSitesOutput = executeQuerySync(listOfSitesQuery);
 						var connection = getOracleDBConnectionRemedy(sync);
 						var listOfSitesOutput = getOracleQueryResult(connection, listOfSitesQuery,sync);
-						//// doRelease(connection);
+						doRelease(connection);
 						if (listOfSitesOutput != null && listOfSitesOutput.rows.length > 0) {
 							outputText = "Do you know the site or node name. Common names in " + data.context.cxt_region_full_name + " are <br/>";
 							for (i = 0; i < listOfSitesOutput.rows.length; i++) {
 								if (i > 0 && i % 4 == 0) {
 									outputText += "<br/>";
 								}
-								outputText += listOfSitesOutput.rows[i].site_name;
+								outputText += listOfSitesOutput.rows[i].SITE_NAME;
 								if (i < listOfSitesOutput.rows.length - 1)
 									outputText += ",&nbsp;";
 
@@ -231,7 +237,7 @@ app.post('/api/message', function (req, res) {
 
 					var connection = getOracleDBConnection( sync);
 					var sitenameOutput = getOracleQueryResult(connection, sitenameSql, sync);
-					//// doRelease(connection);
+					doRelease(connection);
 
 					if (sitenameOutput != null && sitenameOutput.data.rows != null && sitenameOutput.data.rows.length >= 1) {
 						// site name found
@@ -244,7 +250,7 @@ app.post('/api/message', function (req, res) {
 							//var incidentOutput = executeQuerySync(incidentSql);
 							var connection = getOracleDBConnectionRemedy(sync);
 							var listOfSitesOutput = getOracleQueryResult(connection, incidentSql,sync);
-							//// doRelease(connection);
+							doRelease(connection);
 							outputText = showIncidentsForSiteName(incidentOutput.rows, outputText, data, conversationId); // this method is used for displaying incident information
 							data.context.cxt_site_name_region_flow_found = false;
 							data.context.cxt_site_name_region_flow = null;
@@ -307,7 +313,7 @@ app.post('/api/message', function (req, res) {
 					console.log("location query from context variable =>" + locationSql);
 					var connection = getOracleDBConnection( sync);
 					var locationOutput = getOracleQueryResult(connection, locationSql, sync);
-					//// doRelease(connection);
+					doRelease(connection);
 					//var locationOutput = executeQuerySync(locationSql);
 					var inOperator = "(";
 					console.log("site names on location =>" + locationOutput.rows.length);
@@ -329,7 +335,7 @@ app.post('/api/message', function (req, res) {
 						//var incidentOutput = executeQuerySync(incidentSql);
 						var connection = getOracleDBConnectionRemedy(sync);
 						var incidentOutput = getOracleQueryResult(connection, incidentSql,sync);
-						//// doRelease(connection);
+						doRelease(connection);
 						data.context.cxt_region_flow_search_for_location = false;
 						data.context.cxt_region_full_name = null;
 						outputText = showIncidentsForRegionBasedOnLocation(incidentOutput.rows, outputText, data, conversationId);
@@ -377,7 +383,7 @@ app.post('/api/message', function (req, res) {
 						//var incidentOutput = executeQuerySync(incidentSql);
 						var connection = getOracleDBConnectionRemedy(sync);
 						var incidentOutput = getOracleQueryResult(connection, incidentSql,sync);
-						//// doRelease(connection);
+						doRelease(connection);
 						
 						outputText = showIncidentsForTransmissionFailureOnLocation(incidentOutput.rows, outputText, data, conversationId);
 						data.context.cxt_tx_name = null;
@@ -488,7 +494,7 @@ app.post('/api/message', function (req, res) {
 						
 						var connection = getOracleDBConnection(oracleConnectionString);
 						var output = getOracleQueryResult(connection, sql);
-						//// doRelease(connection);
+						doRelease(connection);
 						//var output = executeQuerySync(sql);
 
 						data.context.cxt_matched_customer_count = output.data.rows.length;
@@ -527,7 +533,7 @@ app.post('/api/message', function (req, res) {
 							console.log(sql);
 							var connection = getOracleDBConnection(oracleConnectionString);
 							var output = getOracleQueryResult(connection, sql);
-							//// doRelease(connection);
+							doRelease(connection);
 							//output = executeQuerySync(sql);
 
 							//outputText = "Please see summary of the end point for " + data.context.cxt_show_customer_selected_name + "<br/>";
@@ -538,12 +544,12 @@ app.post('/api/message', function (req, res) {
 							var nodeSql = "select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where HPD_CI like '%" + nodeId + "%'";
 							for (j = 0; j < output.data.rows.length; j++) {
 								nodeId = output.data.rows[j].NID;
-								nodeSql += " OR site_name like '%" + nodeId + "%'"
+								nodeSql += " OR HPD_CI like '%" + nodeId + "%'"
 							}
 							console.log(nodeSql);
 							var connection = getOracleDBConnectionRemedy(oracleConnectionString);
 							var output = getOracleQueryResult(connection, sql);
-							//// // doRelease(connection);
+							doRelease(connection);
 							//console.log(output.data.rows);
 							if (output != null && output.data.rows.length == 0) {
 
@@ -560,7 +566,7 @@ app.post('/api/message', function (req, res) {
 								for (i = 0; i < output.data.rows.length; i++) {
 
 
-									outputText += "<tr><td>" + output.data.rows[i].incident_number + "</td><td>" + output.data.rows[i].summary + "</td><td>" + output.data.rows[i].status + "</td><td>" + output.data.rows[i].site_name + "</td></tr>";
+									outputText += "<tr><td>" + output.data.rows[i].INCIDENT_NUMBER + "</td><td>" + output.data.rows[i].SUMMARY + "</td><td>" + output.data.rows[i].STATUS + "</td><td>" + output.data.rows[i].SITE_NAME + "</td></tr>";
 
 								}
 								outputText += "</table><br/>";

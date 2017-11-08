@@ -2,13 +2,12 @@ module.exports = function () {
 var excelbuilder = require('msexcel-builder');
 var S = require('string');
 var excelGenerationRecordCountLimit = 10;
-var incidentTableName = "VODACOM.HPD_HELP_DESK inc";
-var incidentTableName_2 = "VODACOM.HPD_HELP_DESK inc_2";
-var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as parent_incident_number,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as incident_event_start_time,"+
-"TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as incident_event_end_time,"+
-"inc.SPE_FLD_ACTUALIMPACT as impact,inc.REGION,inc.HPD_CI as site_name,inc.DESCRIPTION as summary,decode(inc.status,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.status) as INC_STATUS,inc.ASSIGNED_GROUP as assigned_group,"+
-"inc.ASSIGNEE,inc.ASSIGNEE_GROUP as task_assignee_group,inc.ASSIGNEE_ID as task_assignee,inc.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2,"+
-"inc.RESOLUTION_CATEGORY_TIER_3 as resolution_category_tier_3,inc.GENERIC_CATEGORIZATION_TIER_1 as cause_tier_1,inc.GENERIC_CATEGORIZATION_TIER_2 as cause_tier_2 ";
+var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
+var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
+
+var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,inc.ASSIGNED_GROUP,inc.RESOLUTION_CATEGORY_TIER_2 as RESOLUTION_CATEGORY_TIER_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";
+
+var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,tas.ASSIGNEE_GROUP as TASK_ASSIGNEE_GROUP,tas.ASSIGNEE as TASK_ASSIGNEE,tas.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 "; 
     
 // Orchestration Layer Methods 
  this.orchestrateBotResponseTextForSiteName = function (dbQueryResult, outputText, response, childCount) {
@@ -21,25 +20,25 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
 		outputText = S(outputText).replaceAll('[impact]', dbQueryResult[0].impact).s;
 		outputText = S(outputText).replaceAll('[region]', dbQueryResult[0].region).s;
-		outputText = S(outputText).replaceAll('[site_name]', dbQueryResult[0].site_name).s;
+		outputText = S(outputText).replaceAll('[site_name]', dbQueryResult[0].SITE_NAME).s;
 		outputText = S(outputText).replaceAll('[status]', dbQueryResult[0].INC_STATUS).s;
-		outputText = S(outputText).replaceAll('[assigned_to]', dbQueryResult[0].assigned_group).s;
-		outputText = S(outputText).replaceAll('[incident_summary]', dbQueryResult[0].summary).s;
-		outputText = S(outputText).replaceAll('[task_assignee_group]', dbQueryResult[0].task_assignee_group).s;
-		outputText = S(outputText).replaceAll('[task_assignee]', dbQueryResult[0].task_assignee).s;
+		outputText = S(outputText).replaceAll('[assigned_to]', dbQueryResult[0].ASSIGNED_GROUP).s;
+		outputText = S(outputText).replaceAll('[incident_summary]', dbQueryResult[0].SUMMARY).s;
+		outputText = S(outputText).replaceAll('[task_assignee_group]', dbQueryResult[0].TASK_ASSIGNEE_GROUP).s;
+		outputText = S(outputText).replaceAll('[task_assignee]', dbQueryResult[0].TASK_ASSIGNEE).s;
 		console.log("Output after replace =>" + outputText);
 		if (dbQueryResult[0].INC_STATUS.toLowerCase() == 'closed') {
 
-			outputText += "<br/><b>Incident Event Start:</b> <i>" + dbQueryResult[0].incident_event_start_time + "</i> <br/> <b>Incident Event Closed:</b> <i>" + dbQueryResult[0].incident_event_end_time + "</i>.";
-			outputText += "<br/><b>Cause: </b>" + dbQueryResult[0].cause_tier_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].resolution_category_tier_3 + "";
+			outputText += "<br/><b>Incident Event Start:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_START_TIME + "</i> <br/> <b>Incident Event Closed:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_END_TIME + "</i>.";
+			outputText += "<br/><b>Cause: </b>" + dbQueryResult[0].cause_tier_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].RESOLUTION_CATEGORY_TIER_3 + "";
 		}
-		if (dbQueryResult[0].parent_incident_number == '' || dbQueryResult[0].parent_incident_number == null) { // incident is master incident
+		if (dbQueryResult[0].PARENT_INCIDENT_NUMBER == '' || dbQueryResult[0].PARENT_INCIDENT_NUMBER == null) { // incident is master incident
 			response.context.cxt_is_master_incident = true;
-			response.context.cxt_incident_number = dbQueryResult[0].incident_number;
+			response.context.cxt_incident_number = dbQueryResult[0].INCIDENT_NUMBER;
 			var child_incident_count = childCount;
 			response.context.cxt_child_incident_count = child_incident_count;
 
-			outputText += "<br/><br/> I also found that  <b>" + dbQueryResult[0].incident_number + "</b> is a <b>master</b> incident ";
+			outputText += "<br/><br/> I also found that  <b>" + dbQueryResult[0].INCIDENT_NUMBER + "</b> is a <b>master</b> incident ";
 			if (childCount > 0) {
 				outputText += "and it has " + child_incident_count + " child incidents, if you like to see these incidents detail, reply with <b>yes</b>.";
 			} else {
@@ -48,8 +47,8 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 			}
 		} else {
 			response.context.cxt_is_master_incident = false;
-			response.context.cxt_parent_incident_number = dbQueryResult[0].parent_incident_number;
-			outputText += "<br/><br/> I found that " + dbQueryResult[0].incident_number + " child of master incident " + dbQueryResult[0].parent_incident_number + ". if you like to see the detail of master incident, reply with <b>yes</b>.";
+			response.context.cxt_parent_incident_number = dbQueryResult[0].PARENT_INCIDENT_NUMBER;
+			outputText += "<br/><br/> I found that " + dbQueryResult[0].INCIDENT_NUMBER + " child of master incident " + dbQueryResult[0].PARENT_INCIDENT_NUMBER + ". if you like to see the detail of master incident, reply with <b>yes</b>.";
 		}
 
 
@@ -63,21 +62,21 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
  this.showParentIncidentDetails = function (dbQueryResult, outputText, data) {
     var outputText_new = '';
-	outputText_new = "Please see details below for Master incident <b>" + dbQueryResult[0].incident_number + "</b>.<br/><br/>";
+	outputText_new = "Please see details below for Master incident <b>" + dbQueryResult[0].INCIDENT_NUMBER + "</b>.<br/><br/>";
 	outputText_new += "This incident was logged for <b><i>[site_name]</i></b> in the <b><i>[region]</i></b>.<br/>The status is <b><i>[status]</i></b>, impact is set to <b><i>[impact]</i></b> and it has been assigned to the <b><i>[assigned_to]</i></b>.<br/>        <b>Incident Summary :</b> [incident_summary]<br/><b>Task Assignee group :</b> [task_assignee_group]<br><b>Task Assignee :</b> [task_assignee]";
 
-	outputText_new = S(outputText_new).replaceAll('[impact]', dbQueryResult[0].impact).s;
-	outputText_new = S(outputText_new).replaceAll('[region]', dbQueryResult[0].region).s;
-	outputText_new = S(outputText_new).replaceAll('[site_name]', dbQueryResult[0].site_name).s;
-	outputText_new = S(outputText_new).replaceAll('[status]', dbQueryResult[0].status).s;
-	outputText_new = S(outputText_new).replaceAll('[assigned_to]', dbQueryResult[0].assigned_group).s;
-	outputText_new = S(outputText_new).replaceAll('[incident_summary]', dbQueryResult[0].summary).s;
-	outputText_new = S(outputText_new).replaceAll('[task_assignee_group]', dbQueryResult[0].task_assignee_group).s;
-	outputText_new = S(outputText_new).replaceAll('[task_assignee]', dbQueryResult[0].task_assignee).s;
+	outputText_new = S(outputText_new).replaceAll('[impact]', dbQueryResult[0].IMPACT).s;
+	outputText_new = S(outputText_new).replaceAll('[region]', dbQueryResult[0].REGION).s;
+	outputText_new = S(outputText_new).replaceAll('[site_name]', dbQueryResult[0].SITE_NAME).s;
+	outputText_new = S(outputText_new).replaceAll('[status]', dbQueryResult[0].INC_STATUS).s;
+	outputText_new = S(outputText_new).replaceAll('[assigned_to]', dbQueryResult[0].ASSIGNED_GROUP).s;
+	outputText_new = S(outputText_new).replaceAll('[incident_summary]', dbQueryResult[0].SUMMARY).s;
+	outputText_new = S(outputText_new).replaceAll('[task_assignee_group]', dbQueryResult[0].TASK_ASSIGNEE_GROUP).s;
+	outputText_new = S(outputText_new).replaceAll('[task_assignee]', dbQueryResult[0].TASK_ASSIGNEE).s;
 
 	if (dbQueryResult[0].INC_STATUS.toLowerCase() == 'closed') {
-		outputText_new += "<br/><b>Incident Event Start:</b> <i>" + dbQueryResult[0].incident_event_start_time + "</i> <br/> <b>Incident Event Closed:</b> <i>" + dbQueryResult[0].incident_event_end_time + "</i>.";
-		outputText_new += "<br/><b>Cause: </b>" + dbQueryResult[0].cause_tier_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].resolution_category_tier_3 + "";
+		outputText_new += "<br/><b>Incident Event Start:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_START_TIME + "</i> <br/> <b>Incident Event Closed:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_END_TIME + "</i>.";
+		outputText_new += "<br/><b>Cause: </b>" + dbQueryResult[0].cause_tier_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].RESOLUTION_CATEGORY_TIER_3 + "";
 	}
 
 
@@ -106,7 +105,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 			if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 				break;
 			}
-			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+			outputText_new += "<tr><td>" + dbQueryResult[i].INCIDENT_NUMBER + "</td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
 
 		}
 		outputText_new += "</table><br/>";
@@ -124,34 +123,34 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
  this.orchestrateBotResponseTextForIncident = function (dbQueryResult, outputText, response, childCount) {
     console.log("orchestrateBotResponseTextForIncident = >Length of rows =>" + dbQueryResult.length);
-	//console.log ("Output =>" + outputText);
+	console.log ("dbQueryResult =>" + JSON.stringify(dbQueryResult));
 	if (dbQueryResult != null && dbQueryResult.length == 0) {
 		outputText = "Sorry, no result can be found against given incident number.";
 	}
 	if (dbQueryResult != null && dbQueryResult.length >= 1) {
 
-		outputText = S(outputText).replaceAll('[impact]', dbQueryResult[0].impact).s;
-		outputText = S(outputText).replaceAll('[region]', dbQueryResult[0].region).s;
-		outputText = S(outputText).replaceAll('[site_name]', dbQueryResult[0].site_name).s;
+		outputText = S(outputText).replaceAll('[impact]', dbQueryResult[0].IMPACT).s;
+		outputText = S(outputText).replaceAll('[region]', dbQueryResult[0].REGION).s;
+		outputText = S(outputText).replaceAll('[site_name]', dbQueryResult[0].SITE_NAME).s;
 		outputText = S(outputText).replaceAll('[status]', dbQueryResult[0].INC_STATUS).s;
-		outputText = S(outputText).replaceAll('[assigned_to]', dbQueryResult[0].assigned_group).s;
-		outputText = S(outputText).replaceAll('[incident_summary]', dbQueryResult[0].summary).s;
-		outputText = S(outputText).replaceAll('[task_assignee_group]', dbQueryResult[0].task_assignee_group).s;
-		outputText = S(outputText).replaceAll('[task_assignee]', dbQueryResult[0].task_assignee).s;
+		outputText = S(outputText).replaceAll('[assigned_to]', dbQueryResult[0].ASSIGNED_GROUP).s;
+		outputText = S(outputText).replaceAll('[incident_summary]', dbQueryResult[0].SUMMARY).s;
+		outputText = S(outputText).replaceAll('[task_assignee_group]', dbQueryResult[0].TASK_ASSIGNEE_GROUP).s;
+		outputText = S(outputText).replaceAll('[task_assignee]', dbQueryResult[0].TASK_ASSIGNEE).s;
 		console.log("Output after replace =>" + outputText);
-		outputText += "<br/><i><b>Incident Event Start:</b> <i>" + dbQueryResult[0].incident_event_start_time;
+		outputText += "<br/><i><b>Incident Event Start:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_START_TIME;
 		if (dbQueryResult[0].INC_STATUS.toLowerCase() == 'closed') {
 
-			outputText += "<br/><b>Incident Event Closed:</b> <i>" + dbQueryResult[0].incident_event_end_time + "</i>.";
-			outputText += "<br/><b>Cause: </b>" + dbQueryResult[0].cause_tier_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].resolution_category_tier_3 + "";
+			outputText += "<br/><b>Incident Event Closed:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_END_TIME + "</i>.";
+			outputText += "<br/><b>Cause: </b>" + dbQueryResult[0].CAUSE_TIER_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].RESOLUTION_CATEGORY_TIER_3 + "";
 		}
-		if (dbQueryResult[0].parent_incident_number == '' || dbQueryResult[0].parent_incident_number == null) { // incident is master incident
+		if (dbQueryResult[0].PARENT_INCIDENT_NUMBER == '' || dbQueryResult[0].PARENT_INCIDENT_NUMBER == null) { // incident is master incident
 			response.context.cxt_is_master_incident = true;
-			response.context.cxt_incident_number = dbQueryResult[0].incident_number;
+			response.context.cxt_incident_number = dbQueryResult[0].INCIDENT_NUMBER;
 			var child_incident_count = childCount;
 			response.context.cxt_child_incident_count = child_incident_count;
 
-			outputText += "<br/> I also found that  <b>" + dbQueryResult[0].incident_number + "</b> is a <b>master</b> incident ";
+			outputText += "<br/> I also found that  <b>" + dbQueryResult[0].INCIDENT_NUMBER + "</b> is a <b>master</b> incident ";
 			if (childCount > 0) {
 				outputText += "and it has <b>" + child_incident_count + "</b> child incidents, if you like to see these incidents detail, reply with <b>yes</b>.";
 
@@ -162,8 +161,8 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 			}
 		} else {
 			response.context.cxt_is_master_incident = false;
-			response.context.cxt_parent_incident_number = dbQueryResult[0].parent_incident_number;
-			outputText += "<br/> I found that " + dbQueryResult[0].incident_number + " child of master incident " + dbQueryResult[0].parent_incident_number + ". if you like to see the detail of master incident, reply with <b>yes</b>.";
+			response.context.cxt_parent_incident_number = dbQueryResult[0].PARENT_INCIDENT_NUMBER;
+			outputText += "<br/> I found that " + dbQueryResult[0].INCIDENT_NUMBER + " child of master incident " + dbQueryResult[0].PARENT_INCIDENT_NUMBER + ". if you like to see the detail of master incident, reply with <b>yes</b>.";
 
 		}
 
@@ -181,16 +180,16 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 	var childIncidentCount = 0;
 	if (dbQueryResult != null) {
 
-		var masterIncidentCountsql = "Select distinct(inc.incident_number),count(*) as masterCount from "+incidentTableName+" where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER  is null and and inc.STATUS not in (5,6);";
+		var masterIncidentCountsql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as masterCount from "+incidentTableName+" where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER  is null and and inc.STATUS not in (5,6);";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
         //var masterIncidentCountResult = executeQuerySync(masterIncidentCountsql);
         var connection = getOracleDBConnectionRemedy(sync);
         var masterIncidentCountResult = getOracleQueryResult(connection, masterIncidentCountsql,sync);
-        //doRelease(connection);
+        doRelease(connection);
 
 		masterIncidentCount = masterIncidentCountResult.rows[0].masterCount;
 
-		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.parent_incident_number = inc_2.incident_number) where inc.region like '%" + regionName_2 + "%' and inc.parent_incident_number is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
+		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.PARENT_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.region like '%" + regionName_2 + "%' and inc.PARENT_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
         console.log("childIncidentCountsql =>" + childIncidentCountsql);
         var connection = getOracleDBConnectionRemedy(sync);
         var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);
@@ -208,7 +207,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 		}*/
 		//data.context.cxt_region_name = dbQueryResult[0].region;
 		outputText = S(outputText).replaceAll('[open_incident_count]', "<b>" + dbQueryResult[0].incidentCount + "</b>").s;
-		outputText = S(outputText).replaceAll('[region_name]', "<b>" + dbQueryResult[0].region + "</b>").s;
+		outputText = S(outputText).replaceAll('[region_name]', "<b>" + dbQueryResult[0].REGION + "</b>").s;
 		outputText = S(outputText).replaceAll('[master_incident_count]', "<b>" + masterIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[child_incident_count]', "<b>" + childIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[is_are]', is_are).s;
@@ -283,7 +282,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 			if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 				break;
 			}
-			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+			outputText_new += "<tr><td>" + dbQueryResult[i].INCIDENT_NUMBER + "</td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
 
 		}
 		outputText_new += "</table><br/>";
@@ -317,7 +316,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 				if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 					break;
 				}
-				outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].region + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+				outputText_new += "<tr><td>" + dbQueryResult[i].INCIDENT_NUMBER + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].REGION + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
 
 			}
 			outputText_new += "</table><br/>";
@@ -353,7 +352,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 				if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 					break;
 				}
-				outputText_new += "<tr><td>" + dbQueryResult[i].count + "</td><td>" + dbQueryResult[i].parent_incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+				outputText_new += "<tr><td>" + dbQueryResult[i].count + "</td><td>" + dbQueryResult[i].PARENT_INCIDENT_NUMBER + "</td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
 
 			}
 			outputText_new += "</table><br/>";
@@ -391,7 +390,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 			if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 				break;
 			}
-			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+			outputText_new += "<tr><td>" + dbQueryResult[i].INCIDENT_NUMBER + "</td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
 
 		}
 		outputText_new += "</table><br/>";
@@ -425,7 +424,7 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 		outputText_new += "<tr><th>INCIDENT NUMBER</th><th>DESCRIPTION</th><th>STATUS</th><th>SITE NAME</th></tr>";
 		for (i = 0; i < dbQueryResult.length; i++) {
 
-			outputText_new += "<tr><td>" + dbQueryResult[i].incident_number + "</td><td>" + dbQueryResult[i].summary + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].site_name + "</td></tr>";
+			outputText_new += "<tr><td>" + dbQueryResult[i].INCIDENT_NUMBER + "</td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
 
 		}
 		outputText_new += "</table><br/>";
@@ -471,8 +470,8 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
 		masterIncidentCount = masterIncidentCountResult.rows[0].masterCount;
 
-		//var childIncidentCountsql = "Select count(*) as childCount from incidents where cause_tier_1 like '" + cause_tier_1 + "' and parent_incident_number is not null and LOWER(status) != 'closed'";
-		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inc inner join "+incidentTableName_2+" on (inc.parent_incident_number = inc_2.incident_number) where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and inc_2.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and i.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
+		//var childIncidentCountsql = "Select count(*) as childCount from incidents where cause_tier_1 like '" + cause_tier_1 + "' and PARENT_INCIDENT_NUMBER is not null and LOWER(status) != 'closed'";
+		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inc inner join "+incidentTableName_2+" on (inc.PARENT_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and inc_2.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and i.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
 		console.log("childIncidentCountsql =>" + childIncidentCountsql);
 		var connection = getOracleDBConnectionRemedy(sync);
 		var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);
@@ -539,10 +538,10 @@ var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 	for (var i = 2; i < numberOfRowsNew; i++) {
 		//sheet1.set(col, row, data);
 		//console.log(i);
-		sheet1.set(1, i, dbQueryResult[j].incident_number);
-		sheet1.set(2, i, dbQueryResult[j].summary);
-		sheet1.set(3, i, dbQueryResult[j].status);
-		sheet1.set(4, i, dbQueryResult[j].site_name);
+		sheet1.set(1, i, dbQueryResult[j].INCIDENT_NUMBER);
+		sheet1.set(2, i, dbQueryResult[j].SUMMARY);
+		sheet1.set(3, i, dbQueryResult[j].INC_STATUS);
+		sheet1.set(4, i, dbQueryResult[j].SITE_NAME);
 		if (j == numberOfRows) {
 			break;
 		} else {

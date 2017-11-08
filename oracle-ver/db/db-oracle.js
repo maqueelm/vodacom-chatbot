@@ -7,7 +7,7 @@ module.exports = function() {
         connectString: dbConfig.connectString
     };
 
-    var remedyConnectionString = {
+    var remedyString = {
         user: dbConfig.remedyUser,
         password: dbConfig.remedyPassword,
         connectString: dbConfig.remedyConnectionString 
@@ -24,7 +24,7 @@ module.exports = function() {
 
     this.getOracleDBConnectionRemedy = function (sync) {
         try {
-            var connection = sync.await(oracledb.getConnection(remedyConnectionString, sync.defer()));
+            var connection = sync.await(oracledb.getConnection(remedyString, sync.defer()));
         } catch (err) {
             //TODO Handle error
             console.log("error=>" + JSON.stringify(err.message));
@@ -35,7 +35,7 @@ module.exports = function() {
     this.getOracleQueryResult = function (connection, sql,sync) {
         try {
             var result = sync.await(connection.execute(sql, [], { outFormat: oracledb.OBJECT }, sync.defer()));
-            this.doRelease(connection);
+            //this.doRelease(connection);
         }
         catch (err) {
             //TODO Handle error
