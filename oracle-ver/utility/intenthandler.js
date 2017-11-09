@@ -172,7 +172,7 @@ module.exports = function () {
                     var regionName_2 = S(regionName_1).replaceAll('Africa', "").s;
                     regionName_2 = S(regionName_2).replaceAll('africa', "").s;
                     regionName_2 = S(regionName_2).s;
-                    var sql = "Select distinct(inc.incident_number),count(*) as incidentCount,inc.ORIGINAL_INCIDENT_NUMBER from "+incidentTableName+" where inc.REGION like '%" + regionName_1 + "%' and inc.STATUS not in (5,6) group by (inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER) order by inc.ORIGINAL_INCIDENT_NUMBER desc ";
+                    var sql = "Select distinct(inc.incident_number),count(*) as INCIDENTCOUNT,inc.ORIGINAL_INCIDENT_NUMBER from "+incidentTableName+" where inc.REGION like '%" + regionName_1 + "%' and inc.STATUS not in (5,6) group by (inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER) order by inc.ORIGINAL_INCIDENT_NUMBER desc ";
                     console.log("get incidents details for region =>" + sql);
                     //var output = executeQuerySync(sql);
                     var connection = getOracleDBConnectionRemedy( sync);
@@ -187,12 +187,7 @@ module.exports = function () {
                     if (output != null && output.rows.length == 0) {
                         if (regionName_1 != null)
                             outputText = "Sorry, no result can be found against given region " + regionName_1;
-                    } else {
-                        if (regionName_1 != null)
-                            outputText = "Sorry, no result can be found against given region " + regionName_1;
-                        else 
-                            outputText = "Sorry, no result can be found against given region ";
-                    }
+                    } 
 
                 } else {
                     outputText = "Sorry, you have not provided a region name.";

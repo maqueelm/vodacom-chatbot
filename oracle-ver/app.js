@@ -166,18 +166,21 @@ app.post('/api/message', function (req, res) {
 					var lookupResult = executeQuerySync(regionLookupQuery);
 					if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows[0] != null) {
 						customerRegion = lookupResult.data.rows[0].full_name;
+					} else {
+						customerRegion = data.context.cxt_region_name;
 					}
-					var childsql = "Select count(inc.INCIDENT_NUMBER) as count ,inc_2.STATUS,inc.PARENT_INCIDENT_NUMBER,inc_2.HPD_CI AS SITE_NAME,inc_2.DESCRIPTION AS SUMMARY,inc_2.REGION from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.PARENT_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.region like '%" + customerRegion + "%' and inc.PARENT_INCIDENT_NUMBER is not null and inc.status not in (5,6) and inc_2.status not in (5,6) group by i.ORIGINAL_INCIDENT_NUMBER	order by count desc";
+					
+					var childsql = "Select count(inc.INCIDENT_NUMBER) as COUNT ,decode(inc_2.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc_2.STATUS) as INC_STATUS,inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER AS PARENT_INCIDENT_NUMBER,inc_2.HPD_CI AS SITE_NAME,inc_2.DESCRIPTION AS SUMMARY,inc_2.REGION from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.REGION like '%" + customerRegion + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6) group by (inc_2.STATUS,inc.ORIGINAL_INCIDENT_NUMBER,inc_2.HPD_CI,inc_2.DESCRIPTION,inc_2.REGION,inc.INCIDENT_NUMBER) order by COUNT desc";
 					console.log("query to get Master Incident from context variable =>" + childsql);
 					//var masterIncidentsDetailsResult = executeQuerySync(childsql);
 					var connection = getOracleDBConnectionRemedy(sync);
 					var masterIncidentsDetailsResult = getOracleQueryResult(connection, childsql,sync);
 					doRelease(connection);
 					
-					console.log(masterIncidentsDetailsResult.data.rows.length);
+					console.log(masterIncidentsDetailsResult.rows.length);
 					// if no master found with child association list all masters that are found for the region.
 					if (masterIncidentsDetailsResult.rows.length == 0) {
-						childsql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where inc.region like '%" + customerRegion + "%' and inc.PARENT_INCIDENT_NUMBER is null and inc.status not in (5,6)";
+						childsql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where inc.region like '%" + customerRegion + "%' and inc.ORIGINAL_INCIDENT_NUMBER is null and inc.STATUS not in (5,6)";
 						console.log("query to get Master Incident from context variable =>" + childsql);
 						//masterIncidentsDetailsResult = executeQuerySync(childsql);
 						var connection = getOracleDBConnectionRemedy(sync);

@@ -180,24 +180,25 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 	var childIncidentCount = 0;
 	if (dbQueryResult != null) {
 
-		var masterIncidentCountsql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as masterCount from "+incidentTableName+" where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER  is null and inc.STATUS not in (5,6) group by inc.INCIDENT_NUMBER";
+		var masterIncidentCountsql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as MASTERCOUNT from "+incidentTableName+" where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER  is null and inc.STATUS not in (5,6) group by inc.INCIDENT_NUMBER";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
         //var masterIncidentCountResult = executeQuerySync(masterIncidentCountsql);
         var connection = getOracleDBConnectionRemedy(sync);
         var masterIncidentCountResult = getOracleQueryResult(connection, masterIncidentCountsql,sync);
         doRelease(connection);
+		console.log("masterIncidentCountResult=>"+JSON.stringify(masterIncidentCountResult));
+		masterIncidentCount = masterIncidentCountResult.rows[0].MASTERCOUNT;
 
-		masterIncidentCount = masterIncidentCountResult.rows[0].masterCount;
-
-		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
+		var childIncidentCountsql = "Select count(*) as CHILDCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
         console.log("childIncidentCountsql =>" + childIncidentCountsql);
         var connection = getOracleDBConnectionRemedy(sync);
-        var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);
+		var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);
+		console.log("childIncidentCountResult=>"+JSON.stringify(childIncidentCountResult));
         doRelease(connection);
 		//var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
-		childIncidentCount = childIncidentCountResult.rows[0].childCount;
+		childIncidentCount = childIncidentCountResult.rows[0].CHILDCOUNT;
 		var is_are = "is";
-		if (childIncidentCount > 1) {
+		if (masterIncidentCount > 1) {
 			is_are = "are";
 		}
 		outputText = data.output.text[0];
@@ -205,8 +206,9 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 			outputText += data.output.text[1];
 		}*/
 		//data.context.cxt_region_name = dbQueryResult[0].region;
-		outputText = S(outputText).replaceAll('[open_incident_count]', "<b>" + dbQueryResult[0].incidentCount + "</b>").s;
-		outputText = S(outputText).replaceAll('[region_name]', "<b>" + dbQueryResult[0].REGION + "</b>").s;
+		console.log("dbQueryResult=>"+JSON.stringify(dbQueryResult));
+		outputText = S(outputText).replaceAll('[open_incident_count]', "<b>" + dbQueryResult[0].INCIDENTCOUNT + "</b>").s;
+		outputText = S(outputText).replaceAll('[region_name]', "<b>" + regionName_2 + "</b>").s;
 		outputText = S(outputText).replaceAll('[master_incident_count]', "<b>" + masterIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[child_incident_count]', "<b>" + childIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[is_are]', is_are).s;
@@ -351,7 +353,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 				if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 					break;
 				}
-				outputText_new += "<tr><td>" + dbQueryResult[i].count + "</td><td>" + dbQueryResult[i].PARENT_INCIDENT_NUMBER + "</td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
+				outputText_new += "<tr><td>" + dbQueryResult[i].COUNT + "</td><td>" + dbQueryResult[i].PARENT_INCIDENT_NUMBER + "</td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
 
 			}
 			outputText_new += "</table><br/>";
@@ -533,7 +535,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 	sheet1.set(4, 1, 'Site Name');
 	var j = 0;
 	var numberOfRowsNew = Number(numberOfRows) + Number(2);
-
+	console.log("excel query result =>"+JSON.stringify(dbQueryResult));
 	for (var i = 2; i < numberOfRowsNew; i++) {
 		//sheet1.set(col, row, data);
 		//console.log(i);
