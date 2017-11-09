@@ -1,0 +1,222 @@
+@charset "UTF-8";
+/* CSS Document */
+.no-padding
+{
+	padding:0px;
+}
+.no-margin
+{
+	margin:0px;
+}
+.page-container
+{
+	height: 100%;
+	margin-bottom: 0px;
+}
+.top-header-container
+{
+	z-index:1;
+}
+.top-header {
+    height: 44px;
+    background: rgba(51, 51, 51, 0.7);
+    padding: 0px;
+}
+.vodafone-logo
+{
+	position:absolute;
+	top:0px;
+}
+.leftpannel-container {
+    background-color: #F0F0F0;
+    height: 800px;
+    left: 0px;
+}
+/*SO-bot design*/
+.image-container-16x9 {
+	background-color: rgba(0, 0, 0, 0.8) !important;
+	display: block;
+	width: 100%;
+	position: relative;
+	height: 0;
+	padding: 11.25% 0 0 0;
+	overflow: hidden;
+	
+}
+.image-container-16x9>img{
+	position: absolute;
+	display: block;
+	width: 100%;
+	max-width: 100%;
+	left: -9999px;
+	right: -9999px;
+	bottom: -9999px;
+	top: -9999px;
+	margin: auto;
+	
+}
+
+.whatson-logo {
+
+    padding-left: 0px;
+padding-right: 0px;
+position: fixed;
+z-index: 1;
+}
+
+.whatson-img {
+    width: 100%;
+}
+
+/*so grey chatbox*/
+/*EO:middle field (whatson & user box feilds*/
+.chatbox {
+   background-color: #fff;
+	padding-top: 20px;
+	padding-bottom: 20px;
+	border-right: 1px solid #cdcdcd;
+	border-left: 1px solid #cdcdcd;
+	overflow: auto;
+	margin-top: 12%;
+	height: 453px;
+}
+.newline-dialog
+{
+	margin-bottom:20px;
+}
+.from-watson
+{
+	margin-left:20px;
+	max-width: 88%;
+}
+.whatson-image-container {
+    float: left;
+    width: 70px;
+}
+.from-watson , .from-user{
+    display: inline-block;
+	position: relative;
+	height: auto;
+	background-color: #cdcdcd;
+	padding: 20px;
+	border-radius: 16px;
+	color: #3e3e3e;
+}
+.from-watson.border:before {
+	content: ' ';
+	position: absolute;
+	width: 0;
+	height: 0;
+  left: -40px;
+	right: auto;
+  top: 30px;
+	bottom: auto;
+	border: 20px solid;
+	border-color: #cdcdcd #cdcdcd transparent transparent;
+}
+.from-watson::after {
+    content: ' ';
+position: absolute;
+width: 0;
+height: 0;
+left: -17px;
+right: auto;
+top: 20px;
+bottom: auto;
+border: 9px solid;
+border-color: #cdcdcd #cdcdcd transparent transparent;
+}
+.chat-whatson {
+    width: 70px;	
+	border-radius: 12px;
+	padding: 4px;
+}
+.chat-user
+{
+    width: 70px;	
+	border-radius: 12px;
+	padding: 4px;
+}
+/*EO whatson dialog chatbox*/
+/*SO : user class over ride whatson box*/
+.from-user{
+	background-color:#f3f3f3;
+	
+}
+.from-user::after {
+    content: ' ';
+    position: absolute;
+    width: 0;
+    height: 0;
+    left: auto;
+    right: -17px;
+    top: 20px;
+    bottom: auto;
+    border: 9px solid;
+    border-color: #f3f3f3 transparent transparent #f3f3f3;
+}
+.chat-user{
+	float:right;
+}
+.user-image-container{
+	float:right;
+}
+.from-user {
+   margin-right: 20px;
+	max-width: 88%;
+	float: right;
+}
+/*EO : user class over ride whatson box*/
+/*EO:middle field (whatson & user box feilds*/
+/*SO: Input field classes*/
+.chat-input
+{
+	width: 100%;
+border-radius: 16px;
+border-style: solid;
+padding: 10px;
+}
+.input-field-container
+{
+	background: #e30a17; /* For browsers that do not support gradients */
+  background: -webkit-linear-gradient(left, #e30a17, #901903); /* For Safari 5.1 to 6.0 */
+  background: -o-linear-gradient(right, #e30a17, #901903); /* For Opera 11.1 to 12.0 */
+  background: -moz-linear-gradient(right,#e30a17,#901903); /* For Firefox 3.6 to 15 */
+  background: linear-gradient(to right, #e30a17, #901903); /* Standard syntax */
+	
+	padding-top: 15px;
+	padding-bottom: 15px;
+	bottom:0px;
+	left:0px;
+	right:0px;
+	position:fixed;
+}
+.newline-dialog:last-child{
+	margin-bottom:60px;
+}
+/*EO: Input field classes*/
+@media(max-width: 767px) {
+.leftpannel-container{display:none;}
+.vodafone-img 
+{
+    width: 108px;
+}
+.right-pannel-container
+{
+	padding:0px;
+}
+	
+.from-user {
+    margin-right: 20px;
+    max-width: 68%;
+    float: right;
+}
+.from-watson {
+    margin-left: 20px;
+    max-width: 68%;
+}
+.chatbox{
+	margin-bottom:22%;
+}
+}
+/*EO-bot design*/

@@ -1,0 +1,15 @@
+---
+declared-services:
+  vodacom-conversation-service:
+    label: conversation
+    plan: free
+applications:
+- name: ibm-vodacom-chatbot-oracle-db-conn
+  command: npm start
+  path: .
+  memory: 256M
+  instances: 1
+  services:
+  - conversation-oracle-db
+  env:
+    NPM_CONFIG_PRODUCTION: false

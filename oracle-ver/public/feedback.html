@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Vodacom NOC Chatbot - Feedback</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta property="og:image" content="conversation.svg" />
+    <meta property="og:title" content="Vodacom NOC Chatbot" />
+    <meta property="og:description" content="Vodacom Network Operation Center Chatbot for helping queries of operators." />
+
+    <link href="bower_components/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="bower_components/bootstrap/css/main-style.css" rel="stylesheet">
+
+    <script src="bower_components/bootstrap/js/jquery-1.11.3.min.js"></script>
+    <script src="bower_components/bootstrap/js/main.js"></script>
+
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+    <script>
+    function submitForm(){
+        
+        setTimeout(function () { alert('Feedback submitted successfully!');window.close();}, 8000);
+    }
+    </script>
+    <style>
+    table{
+        width:100% !important;
+        margin-top:2%;
+    }
+    table td { padding:5px; }
+    
+    table th {
+        color:#C3100F;
+        background:#fff;
+        padding:5px;
+    }
+    b {
+        color:#C3100F;  
+    }
+    tr:nth-child(odd) {background: #F3F3F3}
+    tr:nth-child(even) {background: #CDCDCD}
+    .w-50{
+       width : 50% !important; 
+       border-spacing: 10px;
+    }
+    .w-60{
+       width : 60% !important;
+       border-spacing: 10px; 
+    }
+    .w-70{
+       width : 70% !important;
+       border-spacing: 10px; 
+    }
+    .w-80{
+       width : 80% !important;
+       border-spacing: 10px; 
+    }
+    .w-90{
+       width : 80% !important;
+       border-spacing: 10px; 
+    }
+    .exit {
+        color:#C3100F; 
+        font-size : 15px;
+        font-weight: bold; 
+    }
+    #scrollingChat{
+        min-height:500px;
+    }
+    .timestamp{
+        float:right;
+        color:#C3100F;
+    }
+    .feedback-img {
+        vertical-align: text-bottom;
+        padding: 5px;
+        width:36px;
+        cursor: pointer;
+    }
+    </style>
+</head>
+
+<body>
+    <div class="row page-container no-margin">
+        <div class="col-xs-12 no-padding">
+
+            <div class="col-xs-12 content-container no-padding">
+
+                <div class="col-xs-12 right-pannel-container no-padding">
+
+
+                    <!--SO : ChatBot App code -->
+                    <div id="scrollingChat-container" class="col-xs-12  chatbot-container no-padding">
+                        <div class="col-xs-12 image-container-16x9 whatson-logo">
+                            <img class="whatson-img" alt="whatson-logo" src="img/header3.jpg">
+                        </div>
+                        <!--SO:middle field (whatson & user box feilds-->
+                        <div id="feedback-section" class="col-xs-12" style='padding-left: 27%;margin-top: 10%;'>
+							<form name='frm-feedback' id='frm-feedback' method='GET' action='./feedbackOptions'>
+								<table style='width:auto !important;'>
+                                        <tr>
+                                            <td colspan='2'><b>This window will auto close in 8 seconds after you will press submit button.</b></td>
+                                        </tr>
+									<tr>
+										<td valign='top'><b>Thumbs down Reason</b></td>
+										<td valign='top'>
+										<input type='radio' name='reason' value='1' checked/>&nbsp;I don’t get it.<br/>
+										<input type='radio' name='reason' value='2'/>&nbsp;The information is wrong.<br/>
+                                        <input type='radio' name='reason' value='3'/>&nbsp;The answer is incomplete.<br/>
+                                        <input type='radio' name='reason' value='4'/>&nbsp;Too complicated.<br/>
+                                        <input type='radio' name='reason' value='5'/>&nbsp;The bot didn’t get what I mean.<br/>
+                                        <input type='radio' name='reason' value='6'/>&nbsp;The experience is not nice.<br/>
+                                        <input type='radio' name='reason' value='7'/>&nbsp;The service is bad.<br/>
+										<input type='hidden' name='closeWindow' id='closeWindow' value='1' />
+										</td>
+									</tr>
+									<tr>
+                                        <td>&nbsp;</td>
+										<td><input type='submit' name='feedback_btn' value='Submit' onclick="submitForm();" />&nbsp;<button name='cancel' onclick='javascript:window.close();'>Cancel</button></td>
+									</tr>
+								</table>
+							</form>
+                        </div>
+                        <!--EO:middle field (whatson & user box feilds-->
+                        <!--SO:inputfield-->
+                        
+                        <!--EO:inputfield-->
+                    </div>
+                    <!--EO : ChatBot App code -->
+                </div>
+            </div>
+        </div>
+    </div>
+   <script>
+   
+   
+  
+   </script>
+    <script src="bower_components/bootstrap/js/bootstrap.min.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/conversation.js"></script>
+    <script src="js/payload.js"></script>
+    <script src="js/global.js"></script>
+</body>
+
+</html>

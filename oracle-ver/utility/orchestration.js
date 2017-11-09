@@ -196,7 +196,6 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
         doRelease(connection);
 		//var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
 		childIncidentCount = childIncidentCountResult.rows[0].childCount;
-
 		var is_are = "is";
 		if (childIncidentCount > 1) {
 			is_are = "are";

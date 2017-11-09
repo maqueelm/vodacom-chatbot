@@ -584,12 +584,6 @@ app.post('/api/message', function (req, res) {
 
 				}
 
-
-
-
-
-
-
 				if (data != null && data.context.cxt_user_logged_in) {
 
 					console.log("user is logged in now checking intent");

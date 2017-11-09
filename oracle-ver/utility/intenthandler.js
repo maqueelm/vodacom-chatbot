@@ -142,8 +142,6 @@ module.exports = function () {
 
             ) {
                 console.log("handleRegionIntent");
-
-
                 var regionName_1 = "";
                 var fullName = "";
                 console.log(JSON.stringify(data.entities));
@@ -158,8 +156,6 @@ module.exports = function () {
 
                     regionName_1 = data.entities[1].value;
                 }*/
-
-
                 data.context.cxt_region_name = regionName_1;
                 console.log("region name =>" + regionName_1);
                 if (regionName_1 != "region") {
