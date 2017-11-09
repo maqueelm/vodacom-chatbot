@@ -180,7 +180,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 	var childIncidentCount = 0;
 	if (dbQueryResult != null) {
 
-		var masterIncidentCountsql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as masterCount from "+incidentTableName+" where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER  is null and and inc.STATUS not in (5,6);";
+		var masterIncidentCountsql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as masterCount from "+incidentTableName+" where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER  is null and inc.STATUS not in (5,6) group by inc.INCIDENT_NUMBER";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
         //var masterIncidentCountResult = executeQuerySync(masterIncidentCountsql);
         var connection = getOracleDBConnectionRemedy(sync);
@@ -189,7 +189,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
 		masterIncidentCount = masterIncidentCountResult.rows[0].masterCount;
 
-		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.PARENT_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.region like '%" + regionName_2 + "%' and inc.PARENT_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
+		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
         console.log("childIncidentCountsql =>" + childIncidentCountsql);
         var connection = getOracleDBConnectionRemedy(sync);
         var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);

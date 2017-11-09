@@ -146,12 +146,18 @@ module.exports = function () {
 
                 var regionName_1 = "";
                 var fullName = "";
-                if (data.entities[0] != null && data.entities[0].entity != "escalation" && data.entities[0].entity != "incidents") {
+                console.log(JSON.stringify(data.entities));
+                for (i = 0; i < data.entities.length; i ++) {
+                    if (data.entities[i].entity == 'regions') {
+                        regionName_1 = data.entities[i].value;
+                    }
+                }
+               /* if (data.entities[0] != null && data.entities[0].entity != "escalation" && data.entities[0].entity != "incidents" && data.entities[0].entity != "summary") {
                     regionName_1 = data.entities[0].value;
                 } else {
 
                     regionName_1 = data.entities[1].value;
-                }
+                }*/
 
 
                 data.context.cxt_region_name = regionName_1;
@@ -170,7 +176,7 @@ module.exports = function () {
                     var regionName_2 = S(regionName_1).replaceAll('Africa', "").s;
                     regionName_2 = S(regionName_2).replaceAll('africa', "").s;
                     regionName_2 = S(regionName_2).s;
-                    var sql = "Select distinct(inc.incident_number),count(*) as incidentCount,"+incidentTableFieldsWithAlias+" from "+incidentTableName+" where inc.REGION like '%" + regionName_1 + "%' and inc.STATUS not in (5,6) order by parent_incident_number desc ;";
+                    var sql = "Select distinct(inc.incident_number),count(*) as incidentCount,inc.ORIGINAL_INCIDENT_NUMBER from "+incidentTableName+" where inc.REGION like '%" + regionName_1 + "%' and inc.STATUS not in (5,6) group by (inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER) order by inc.ORIGINAL_INCIDENT_NUMBER desc ";
                     console.log("get incidents details for region =>" + sql);
                     //var output = executeQuerySync(sql);
                     var connection = getOracleDBConnectionRemedy( sync);
@@ -179,12 +185,17 @@ module.exports = function () {
 
 
 
-                    if (output.data.rows != null && output.data.rows.length >= 1) {
-                        outputText = orchestrateBotResponseTextForRegion(output.data.rows, data.output.text, regionName_1, data,sync);
+                    if (output != null && output.rows.length >= 1) {
+                        outputText = orchestrateBotResponseTextForRegion(output.rows, data.output.text, regionName_1, data,sync);
                     }
-                    if (output.data.rows.length == 0) {
+                    if (output != null && output.rows.length == 0) {
                         if (regionName_1 != null)
                             outputText = "Sorry, no result can be found against given region " + regionName_1;
+                    } else {
+                        if (regionName_1 != null)
+                            outputText = "Sorry, no result can be found against given region " + regionName_1;
+                        else 
+                            outputText = "Sorry, no result can be found against given region ";
                     }
 
                 } else {
