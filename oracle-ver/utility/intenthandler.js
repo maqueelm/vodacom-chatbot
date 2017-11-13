@@ -67,7 +67,7 @@ module.exports = function () {
             if (tier_cause_search_term != null) {
 
                 data.context.cxt_tx_name = tier_cause_search_term;
-                sql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as incidentCount from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + tier_cause_search_term + "' and inc.STATUS not in (5,6) group by inc.INCIDENT_NUMBER";
+                sql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as incidentCount,inc.DESCRIPTION as SUMMARY,inc.STATUS AS INC_STATUS,inc.HPD_CI as SITE_NAME from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + tier_cause_search_term + "' and inc.STATUS not in (5,6) group by (inc.INCIDENT_NUMBER,inc.DESCRIPTION,inc.STATUS,inc.HPD_CI)";
                 console.log(sql);
                 //output = executeQuerySync(sql);
                 var connection = getOracleDBConnectionRemedy( sync);
