@@ -67,7 +67,7 @@ module.exports = function () {
             if (tier_cause_search_term != null) {
 
                 data.context.cxt_tx_name = tier_cause_search_term;
-                sql = "Select distinct "+incidentTableFieldsWithAlias+",count(*) as incidentCount from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + tier_cause_search_term + "' and inc.STATUS not in (5,6);";
+                sql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as incidentCount from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + tier_cause_search_term + "' and inc.STATUS not in (5,6) group by inc.INCIDENT_NUMBER";
                 console.log(sql);
                 //output = executeQuerySync(sql);
                 var connection = getOracleDBConnectionRemedy( sync);
@@ -78,9 +78,9 @@ module.exports = function () {
             if (output != null) {
                 if (output.rows != null && output.rows.length > 0) {
 
-                    outputText = orchestrateBotResponseTextForTransmissionFailures(output.rows, data.output.text, data);
+                    outputText = orchestrateBotResponseTextForTransmissionFailures(output.rows, data.output.text, data,sync);
                 }
-                if (output.data.rows.length == 0) {
+                if (output.rows.length == 0) {
                     //console.log("in not found message.");
                     outputText = "Sorry, <b>no</b> open incidents have been found because of <b>" + tier_cause_search_term + "</b>";
                 }
@@ -115,7 +115,7 @@ module.exports = function () {
                 //console.log(JSON.stringify(data));
                 if (customerName != null) {
 
-                    var sql = "Select * from  telllabes_ods.ebu_vlan_status_v where REPLACE(REPLACE(MPLSVPN_NAME, '_', ' '), '-', ' ') like '%" + customerName + "%';";
+                    var sql = "Select * from  telllabes_ods.ebu_vlan_status_v where REPLACE(REPLACE(MPLSVPN_NAME, '_', ' '), '-', ' ') like '%" + customerName + "%'";
                     console.log("customer sql =>" + sql);
                     //var output = executeQuerySync(sql);
                     var connection = getOracleDBConnection( sync);

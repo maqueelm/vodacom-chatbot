@@ -186,14 +186,14 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
         var connection = getOracleDBConnectionRemedy(sync);
         var masterIncidentCountResult = getOracleQueryResult(connection, masterIncidentCountsql,sync);
         doRelease(connection);
-		console.log("masterIncidentCountResult=>"+JSON.stringify(masterIncidentCountResult));
+		//console.log("masterIncidentCountResult=>"+JSON.stringify(masterIncidentCountResult));
 		masterIncidentCount = masterIncidentCountResult.rows[0].MASTERCOUNT;
 
 		var childIncidentCountsql = "Select count(*) as CHILDCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
         console.log("childIncidentCountsql =>" + childIncidentCountsql);
         var connection = getOracleDBConnectionRemedy(sync);
 		var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);
-		console.log("childIncidentCountResult=>"+JSON.stringify(childIncidentCountResult));
+		//console.log("childIncidentCountResult=>"+JSON.stringify(childIncidentCountResult));
         doRelease(connection);
 		//var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
 		childIncidentCount = childIncidentCountResult.rows[0].CHILDCOUNT;
@@ -206,7 +206,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 			outputText += data.output.text[1];
 		}*/
 		//data.context.cxt_region_name = dbQueryResult[0].region;
-		console.log("dbQueryResult=>"+JSON.stringify(dbQueryResult));
+		//console.log("dbQueryResult=>"+JSON.stringify(dbQueryResult));
 		outputText = S(outputText).replaceAll('[open_incident_count]', "<b>" + dbQueryResult[0].INCIDENTCOUNT + "</b>").s;
 		outputText = S(outputText).replaceAll('[region_name]', "<b>" + regionName_2 + "</b>").s;
 		outputText = S(outputText).replaceAll('[master_incident_count]', "<b>" + masterIncidentCount + "</b>").s;
@@ -226,7 +226,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
  this.updateSuggestedLocationsInMessage = function (messageText, regionCode,sync) {
     
     //var locationQuery = "SELECT location_name FROM `locations_lookup` where remedy_location_name like '%" + regionCode + "%' WHERE ROWNUM < 11";
-    var locationQuery = "SELECT l.object_key as location_key, l.name as location_name, l.atoll_id, l.remedy_name as remedy_location_name, n.OBJECT_CLASS, n.OBJECT_KEY, n.NAME CI_NAME, n.NODE_STATUS, n.PARENT_NODE, n.REMEDY_STATUS, n.REMEDY_ID"+
+    var locationQuery = "SELECT l.object_key as location_key, l.name as location_name, l.atoll_id, l.remedy_name as remedy_location_name, n.OBJECT_CLASS, n.OBJECT_KEY, n.NAME as CI_NAME, n.NODE_STATUS, n.PARENT_NODE, n.REMEDY_STATUS, n.REMEDY_ID"+
                          " FROM name_repo.node_v n JOIN name_repo.site_v l ON n.site = l.object_key WHERE ROWNUM < 11 and n.NODE_STATUS = 'In Service' and l.remedy_name like '%" + regionCode + "%' ";
 	console.log("Query for updating locations in message. =>" + locationQuery);
     //var locationsResultSet = executeQuerySync(locationQuery);
@@ -237,9 +237,9 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 		messageText = '';
 	}
 	if (locationsResultSet != null && locationsResultSet.rows.length > 0) {
-		messageText = "Type the location name. Common Locations are <br/>";
+		messageText = "<b>Type the location name. Common Locations are</b> <br/>";
 		for (i = 0; i < locationsResultSet.rows.length; i++) {
-			messageText += locationsResultSet.rows[i].location_name;
+			messageText += locationsResultSet.rows[i].LOCATION_NAME;
 			if (i < locationsResultSet.rows.length - 1)
 				messageText += ",&nbsp;";
 			if (i > 0 && i % 4 == 0) {
@@ -454,30 +454,31 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
  }
 
- this.orchestrateBotResponseTextForTransmissionFailures = function (dbQueryResult, outputText, data) {
+ this.orchestrateBotResponseTextForTransmissionFailures = function (dbQueryResult, outputText, data,sync) {
 
     console.log("orchestrateBotResponseTextForTransmissionFailures = >Length of rows =>" + dbQueryResult.length);
 	var masterIncidentCount = 0;
 	var childIncidentCount = 0;
 	var outputText_new = '';
 	if (dbQueryResult != null) {
-		data.context.cxt_tx_found_incident_count = dbQueryResult[0].incidentCount;
+		data.context.cxt_tx_found_incident_count = dbQueryResult[0].INCIDENTCOUNT;
 		var cause_tier_1 = data.context.cxt_tx_name;
-		var masterIncidentCountsql = "Select count(*) as masterCount from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and ORIGINAL_INCIDENT_NUMBER is null and inc.STATUS not in (5,6);";
+		var masterIncidentCountsql = "Select count(*) as MASTER_COUNT from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and ORIGINAL_INCIDENT_NUMBER is null and inc.STATUS not in (5,6)";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
 		var connection = getOracleDBConnectionRemedy(sync);
         var masterIncidentCountResult = getOracleQueryResult(connection, masterIncidentCountsql,sync);
 		//var masterIncidentCountResult = executeQuerySync(masterIncidentCountsql);
-
-		masterIncidentCount = masterIncidentCountResult.rows[0].masterCount;
+		if (masterIncidentCountResult != null)
+			masterIncidentCount = masterIncidentCountResult.rows[0].MASTER_COUNT;
 
 		//var childIncidentCountsql = "Select count(*) as childCount from incidents where cause_tier_1 like '" + cause_tier_1 + "' and PARENT_INCIDENT_NUMBER is not null and LOWER(status) != 'closed'";
-		var childIncidentCountsql = "Select count(*) as childCount from "+incidentTableName+" inc inner join "+incidentTableName_2+" on (inc.PARENT_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and inc_2.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and i.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
+		var childIncidentCountsql = "Select count(*) as CHILD_COUNT from "+incidentTableName+" inc inner join "+incidentTableName_2+" on (inc.PARENT_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and inc_2.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and i.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
 		console.log("childIncidentCountsql =>" + childIncidentCountsql);
 		var connection = getOracleDBConnectionRemedy(sync);
 		var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);
 		//var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
-		childIncidentCount = childIncidentCountResult.rows[0].childCount;
+		if (childIncidentCountResult != null)
+		childIncidentCount = childIncidentCountResult.rows[0].CHILD_COUNT;
 
 		var is_are = "is";
 		if (childIncidentCount > 1) {
@@ -488,12 +489,12 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 			outputText += "<br/>" + data.output.text[1];
 		}
 		data.context.cxt_region_name = dbQueryResult[0].region;
-		outputText = S(outputText).replaceAll('[open_incident_count]', "<b>" + dbQueryResult[0].incidentCount + "</b>").s;
+		outputText = S(outputText).replaceAll('[open_incident_count]', "<b>" + dbQueryResult[0].INCIDENTCOUNT + "</b>").s;
 		outputText = S(outputText).replaceAll('[failure_type_name]', "<b>" + cause_tier_1 + "</b>").s;
 		outputText = S(outputText).replaceAll('[master_incident_count]', "<b>" + masterIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[child_incident_count]', "<b>" + childIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[is_are]', is_are).s;
-		if (dbQueryResult[0].incidentCount > 0) {
+		if (dbQueryResult[0].INCIDENTCOUNT > 0) {
 			outputText_new = "<br/>Do you want to further drill down the search? reply with <b>yes or no</b>.";
 		} else {
 			outputText_new = "<br/><b>No</b> incidents found against the given domain. If you want to search anything else reply with <b>yes</b>.";

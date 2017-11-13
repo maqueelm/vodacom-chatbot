@@ -201,7 +201,7 @@ app.post('/api/message', function (req, res) {
 				if (data != null && data.context.cxt_region_show_isolated_fault && data.context.cxt_site_name_region_flow == null && !data.context.cxt_region_flow_search_for_location) {
 					// update message for entering site with actual sites in region of query.
 					if (data.context.cxt_region_full_name != null) {
-						var listOfSitesQuery = "SELECT distinct HPD_CI FROM "+incidentTableName+" WHERE region like '%" + data.context.cxt_region_full_name + "%' WHERE ROWNUM < 11;";
+						var listOfSitesQuery = "SELECT distinct HPD_CI as SITE_NAME FROM "+incidentTableName+" WHERE region like '%" + data.context.cxt_region_full_name + "%' AND ROWNUM < 11";
 						console.log("listOfSitesQuery =>" + listOfSitesQuery);
 						//var listOfSitesOutput = executeQuerySync(listOfSitesQuery);
 						var connection = getOracleDBConnectionRemedy(sync);
@@ -242,7 +242,7 @@ app.post('/api/message', function (req, res) {
 					var sitenameOutput = getOracleQueryResult(connection, sitenameSql, sync);
 					doRelease(connection);
 
-					if (sitenameOutput != null && sitenameOutput.data.rows != null && sitenameOutput.data.rows.length >= 1) {
+					if (sitenameOutput != null && sitenameOutput.rows != null && sitenameOutput.rows.length >= 1) {
 						// site name found
 						data.context.cxt_site_name_region_flow_found = true;
 						if (data.context.cxt_site_name_region_show_incident_detail) {
@@ -311,7 +311,7 @@ app.post('/api/message', function (req, res) {
 					data.context.cxt_location_name_region_flow_found = true;
 					console.log("data.context.cxt_location_name_region_flow_found =>" + data.context.cxt_location_name_region_flow_found);
 					//var locationSql = "Select * from locations_lookup where location_name like '%" + data.context.cxt_location_name_region_flow + "%'";
-					var locationSql = "SELECT l.object_key as location_key, l.name as location_name, l.atoll_id, l.remedy_name as remedy_location_name, n.OBJECT_CLASS, n.OBJECT_KEY, n.NAME CI_NAME, n.NODE_STATUS, n.PARENT_NODE, n.REMEDY_STATUS, n.REMEDY_ID"+
+					var locationSql = "SELECT l.object_key as location_key, l.name as location_name, l.atoll_id, l.remedy_name as remedy_location_name, n.OBJECT_CLASS, n.OBJECT_KEY, n.NAME as CI_NAME, n.NODE_STATUS, n.PARENT_NODE, n.REMEDY_STATUS, n.REMEDY_ID"+
 					" FROM name_repo.node_v n JOIN name_repo.site_v l ON n.site = l.object_key WHERE ROWNUM < 11 and n.NODE_STATUS = 'In Service' and l.remedy_name like '%" + data.context.cxt_location_name_region_flow + "%' ";
 					console.log("location query from context variable =>" + locationSql);
 					var connection = getOracleDBConnection( sync);
@@ -320,10 +320,10 @@ app.post('/api/message', function (req, res) {
 					//var locationOutput = executeQuerySync(locationSql);
 					var inOperator = "(";
 					console.log("site names on location =>" + locationOutput.rows.length);
-					if (locationOutput.data.rows.length > 0) {
+					if (locationOutput.rows.length > 0) {
 						for (i = 0; i < locationOutput.rows.length; i++) {
 
-							inOperator += "'" + locationOutput.rows[i].ci_name + "'";
+							inOperator += "'" + locationOutput.rows[i].CI_NAME + "'";
 
 							if (i < locationOutput.rows.length - 1) {
 								inOperator += ",";
@@ -333,7 +333,7 @@ app.post('/api/message', function (req, res) {
 						}
 						inOperator += ")";
 						console.log(inOperator);
-						var incidentSql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where HPD_CI in " + inOperator + " and status not in (5,6);";
+						var incidentSql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where HPD_CI in " + inOperator + " and status not in (5,6)";
 						console.log(incidentSql);
 						//var incidentOutput = executeQuerySync(incidentSql);
 						var connection = getOracleDBConnectionRemedy(sync);
@@ -360,21 +360,24 @@ app.post('/api/message', function (req, res) {
 					//var locationSql = "Select object_class from locations_lookup where location_name like '%" + data.context.cxt_location_name_trx_flow + "%'";
 
 					//var locationSql = "SELECT distinct ci_name FROM locations_lookup l inner join tech_location_mapping lm ON l.object_class = lm.core_ecs WHERE l.remedy_location_name LIKE '%" + data.context.cxt_location_name_trx_flow + "%' AND lm.tech_type like '%" + data.context.cxt_tx_name + "%'";
-					var locationSql = "SELECT l.object_key as location_key, l.name as location_name, l.atoll_id, l.remedy_name as remedy_location_name, n.OBJECT_CLASS, n.OBJECT_KEY, n.NAME CI_NAME, n.NODE_STATUS, n.PARENT_NODE, n.REMEDY_STATUS, n.REMEDY_ID"+
+					var locationSql = "SELECT l.object_key as location_key, l.name as location_name, l.atoll_id, l.remedy_name as remedy_location_name, n.OBJECT_CLASS, n.OBJECT_KEY, n.NAME as CI_NAME, n.NODE_STATUS, n.PARENT_NODE, n.REMEDY_STATUS, n.REMEDY_ID"+
 					" FROM name_repo.node_v n JOIN name_repo.site_v l ON n.site = l.object_key WHERE ROWNUM < 11 and n.NODE_STATUS = 'In Service' and l.remedy_name like '%" + data.context.cxt_location_name_trx_flow + "%' ";
 
 					console.log("location query from context variable =>" + locationSql);
-					var locationOutput = executeQuerySync(locationSql);
-					console.log("locationOutput.data.rows.length =>" + locationOutput.data.rows.length);
+					//var locationOutput = executeQuerySync(locationSql);
+					var connection = getOracleDBConnection(sync);
+					var incidentOutput = getOracleQueryResult(connection, locationSql,sync);
+					
 					var inOperator = "(";
-					if (locationOutput.data.rows.length > 0) {
+					if (locationOutput !=null && locationOutput.rows.length > 0) {
+						console.log("locationOutput.data.rows.length =>" + locationOutput.rows.length);
 
 						data.context.cxt_location_name_trx_flow_found = true;
-						for (i = 0; i < locationOutput.data.rows.length; i++) {
+						for (i = 0; i < locationOutput.rows.length; i++) {
 
-							inOperator += "'" + locationOutput.data.rows[i].ci_name + "'";
+							inOperator += "'" + locationOutput.rows[i].CI_NAME + "'";
 
-							if (i < locationOutput.data.rows.length - 1) {
+							if (i < locationOutput.rows.length - 1) {
 								inOperator += ",";
 							}
 
