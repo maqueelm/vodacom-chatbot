@@ -3,9 +3,9 @@ module.exports = function () {
     var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
     var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
     var taskTable = "ARADMIN.TMS_TASK";
-    var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,inc.RESOLUTION_CATEGORY_TIER_2 as RESOLUTION_CATEGORY_TIER_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";
+    var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,decode(INC.INCIDENT_ASSOCIATION_TYPE,1,'Child',0,'Master',null,'Standalone',INC.INCIDENT_ASSOCIATION_TYPE) as RELATIONSHIP_TYPE,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,inc.ASSIGNED_GROUP,inc.RESOLUTION_CATEGORY_TIER_2 as RESOLUTION_CATEGORY_TIER_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";
     
-    var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,inc.ASSIGNEE,inc.ASSIGNED_GROUP,tas.ASSIGNEE_GROUP as TASK_ASSIGNEE_GROUP,tas.ASSIGNEE as TASK_ASSIGNEE,tas.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";                                    
+    var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,decode(INC.INCIDENT_ASSOCIATION_TYPE,1,'Child',0,'Master',null,'Standalone',INC.INCIDENT_ASSOCIATION_TYPE) as RELATIONSHIP_TYPE,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,tas.ASSIGNEE_GROUP as TASK_ASSIGNEE_GROUP,tas.ASSIGNEE as TASK_ASSIGNEE,tas.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";                                     
     //Handling Intent Logic for Vodacom chat bot
     
     var S = require('string');
@@ -33,12 +33,12 @@ module.exports = function () {
             console.log("data.context.cxt_ci_flow_show_incident=>" + data.context.cxt_ci_flow_show_incident);
             if (data.context.cxt_ci_site_name_found_in_db && data.context.cxt_ci_flow_show_incident) {
                 var childCount = 0;
-                var incidentSql = "Select "+incidentTableFieldsWithAlias+" from "+incidentTableName+" where inc.HPD_CI like '%" + data.context.cxt_ci_flow_site_name + "%'";
+                var incidentSql = "Select "+incidentTableJoinTaskTable+" from "+incidentTableName+" join "+taskTable+" tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS not in (4,5,6) and inc.HPD_CI ='" + data.context.cxt_ci_flow_site_name + "'";
                 //var incidentResult = executeQuerySync(incidentSql);
                 var connection = getOracleDBConnectionRemedy( sync);
-                var output = getOracleQueryResult(connection, incidentSql, sync);
+                var incidentResult = getOracleQueryResult(connection, incidentSql, sync);
                 doRelease(connection);
-                outputText = showIncidentsForSiteName(incidentResult.rows, outputText, data, conversationId);
+                outputText = showIncidentsForSiteName(incidentResult.rows, outputText, data, data.context.conversation_id);
                 data.context.cxt_ci_site_name_found_in_db = false;
                 data.context.cxt_ci_flow_site_name = null;
             }
@@ -115,11 +115,19 @@ module.exports = function () {
                 //console.log(JSON.stringify(data));
                 if (customerName != null) {
 
-                    var sql = "Select * from  telllabes_ods.ebu_vlan_status_v where REPLACE(REPLACE(MPLSVPN_NAME, '_', ' '), '-', ' ') like '%" + customerName + "%'";
+                    //var sql = "Select MPLSVPN_NAME from  tellabs_ods.ebu_vlan_status_v where REPLACE(REPLACE(MPLSVPN_NAME, '_', ' '), '-', ' ') like '%" + customerName + "%'";
+
+                    var sql = "Select MPLSVPN_NAME from  tellabs_ods.ebu_vlan_status_v where REPLACE(REPLACE(UPPER(MPLSVPN_NAME), '_', ' '), '-', ' ') like '%" + customerName.toUpperCase() + "%'";
+
+                    //NGA-VB-PSI_MSR01_MITCHELL_HOUSE_PLK
                     console.log("customer sql =>" + sql);
                     //var output = executeQuerySync(sql);
                     var connection = getOracleDBConnection( sync);
                     var output = getOracleQueryResult(connection, sql, sync);
+                    console.log(output);
+                    if (output != null && output.rows != null) {
+                        console.log("customer name fetched from DB=>"+output.rows);
+                    }
                     doRelease(connection);
                     outputText = orchestrateBotResponseTextForCustomer(output.rows, data.output.text, customerName, data);
 
@@ -213,9 +221,11 @@ module.exports = function () {
 
 
         }
+        
+
         console.log("goToIncidentIntent=>" + goToIncidentIntent);
 
-        if ((data != null && data.intents[0] != null && data.intents[0].intent == "incident" && goToIncidentIntent) || (data != null && data.entities[0] != null && data.entities[0].entity != 'sys-date' && data.intents[0].intent != "sites" && data.intents[0].intent != "regions" && data.entities[0].entity == "incidents" && goToIncidentIntent)) {
+        if ((data != null && data.intents[0] != null && data.intents[0].intent == "incident" && data.intents[0].confidence > 0.5 && goToIncidentIntent) || (data != null && data.entities[0] != null && data.entities[0].entity != 'sys-date' && data.intents[0].intent != "sites" && data.intents[0].intent != "regions" && data.entities[0].entity == "incidents" && data.intents[0].confidence > 0.5 && goToIncidentIntent)) {
 
             console.log("handleIncidentIntent");
             incidentFlow = true;
