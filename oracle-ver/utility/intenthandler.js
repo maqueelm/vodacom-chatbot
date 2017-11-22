@@ -7,12 +7,12 @@ module.exports = function () {
     
     var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,decode(INC.INCIDENT_ASSOCIATION_TYPE,1,'Child',0,'Master',null,'Standalone',INC.INCIDENT_ASSOCIATION_TYPE) as RELATIONSHIP_TYPE,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,tas.ASSIGNEE_GROUP as TASK_ASSIGNEE_GROUP,tas.ASSIGNEE as TASK_ASSIGNEE,tas.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";                                     
     //Handling Intent Logic for Vodacom chat bot
-    
+    require('./stringhandler')();
     var S = require('string');
     var striptags = require('striptags');
     this.handleSitesIntent = function (data, inputText, outputText,sync) {
         console.log("handleSitesIntent");
-        if (data.context.cxt_ci_flow_site_name != null) {
+        if (data.context.cxt_ci_flow_site_name != null && data.intents[0].intent != "incident") {
             console.log("sites intent context variable checks");
             var lookForSiteNames = "Select ci_name from locations_lookup where ci_name = '" + data.context.cxt_ci_flow_site_name + "'";
             var lookForSiteNamesData = executeQuerySync(lookForSiteNames);
@@ -67,7 +67,7 @@ module.exports = function () {
             if (tier_cause_search_term != null) {
 
                 data.context.cxt_tx_name = tier_cause_search_term;
-                sql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as incidentCount,inc.DESCRIPTION as SUMMARY,inc.STATUS AS INC_STATUS,inc.HPD_CI as SITE_NAME from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + tier_cause_search_term + "' and inc.STATUS not in (5,6) group by (inc.INCIDENT_NUMBER,inc.DESCRIPTION,inc.STATUS,inc.HPD_CI)";
+                sql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as incidentCount,inc.DESCRIPTION as SUMMARY,inc.STATUS AS INC_STATUS,inc.HPD_CI as SITE_NAME from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_2 like '" + tier_cause_search_term + "' and inc.STATUS not in (5,6) group by (inc.INCIDENT_NUMBER,inc.DESCRIPTION,inc.STATUS,inc.HPD_CI)";
                 console.log(sql);
                 //output = executeQuerySync(sql);
                 var connection = getOracleDBConnectionRemedy( sync);
@@ -169,7 +169,7 @@ module.exports = function () {
                 if (regionName_1 != "region") {
 
 
-                    var regionLookupQuery = "Select * from region_lookup where (abbreviation like '" + regionName_1 + "' OR full_name like '" + regionName_1 + "')";
+                    var regionLookupQuery = "Select * from region_lookup where (LOWER(abbreviation) = '" + regionName_1.toLowerCase() + "' OR LOWER(full_name) = '" + regionName_1.toLowerCase() + "')";
 
                     console.log("lookup query =>" + regionLookupQuery);
                     var lookupResult = executeQuerySync(regionLookupQuery);
@@ -180,7 +180,7 @@ module.exports = function () {
                     var regionName_2 = S(regionName_1).replaceAll('Africa', "").s;
                     regionName_2 = S(regionName_2).replaceAll('africa', "").s;
                     regionName_2 = S(regionName_2).s;
-                    var sql = "Select distinct(inc.incident_number),count(*) as INCIDENTCOUNT,inc.ORIGINAL_INCIDENT_NUMBER from "+incidentTableName+" where inc.REGION like '%" + regionName_1 + "%' and inc.STATUS not in (5,6) group by (inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER) order by inc.ORIGINAL_INCIDENT_NUMBER desc ";
+                    var sql = "Select count(distinct inc.incident_number) as INCIDENTCOUNT from "+incidentTableName+" where LOWER(inc.REGION) = '" + regionName_1.toLowerCase() + "' and inc.STATUS not in (5,6)";
                     console.log("get incidents details for region =>" + sql);
                     //var output = executeQuerySync(sql);
                     var connection = getOracleDBConnectionRemedy( sync);
@@ -225,13 +225,13 @@ module.exports = function () {
 
         console.log("goToIncidentIntent=>" + goToIncidentIntent);
 
-        if ((data != null && data.intents[0] != null && data.intents[0].intent == "incident" && data.intents[0].confidence > 0.5 && goToIncidentIntent) || (data != null && data.entities[0] != null && data.entities[0].entity != 'sys-date' && data.intents[0].intent != "sites" && data.intents[0].intent != "regions" && data.entities[0].entity == "incidents" && data.intents[0].confidence > 0.5 && goToIncidentIntent)) {
+        if ((data != null && data.intents[0] != null && data.intents[0].intent == "incident" && data.intents[0].intent != "sites" && data.intents[0].intent != "regions" && goToIncidentIntent) || (data != null && data.entities[0] != null && data.entities[0].entity != 'sys-date' && data.intents[0].intent != "sites" && data.intents[0].intent != "regions" && data.entities[0].entity == "incidents" && goToIncidentIntent)) {
 
             console.log("handleIncidentIntent");
             incidentFlow = true;
             //console.log(JSON.stringify(data));
             if (inputText != null) {
-                regexTest = inputText.match(/INC[0-9]+/i);
+                regexTest = inputText.match(/[incINC]*([0-9])+/i);
 
                 var incidentNumber = false;
                 if (regexTest != null) {
@@ -249,18 +249,18 @@ module.exports = function () {
 
                 console.log(JSON.stringify(incidentNumber));
                 if (incidentNumber) {
-                    var incident_no_str = incidentNumber;
-                    incidentNumber = S(incidentNumber).replaceAll('INC', '').s;
-                    incidentNumber = S(incidentNumber).replaceAll('inc', '').s;
+                    var incident_no_str = incidentNumber.toUpperCase();
+                    incidentNumber = correctIncidentNumberFormat(incident_no_str);
+                   // incidentNumber = S(incidentNumber).replaceAll('inc', '').s;
                    
-                    var sql = "Select "+incidentTableJoinTaskTable+" from "+incidentTableName+" join "+taskTable+" tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS not in (5,6) and inc.INCIDENT_NUMBER  like '%" + incidentNumber + "%'";
+                    var sql = "Select "+incidentTableJoinTaskTable+" from "+incidentTableName+" join "+taskTable+" tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS not in (5,6) and inc.INCIDENT_NUMBER  = '" + incidentNumber + "'";
                     console.log(sql);
                     //var output = executeQuerySync(sql);
                     var connection = getOracleDBConnectionRemedy(sync);
                     var output = getOracleQueryResult(connection, sql, sync);
                     doRelease(connection);
                     
-                    var childsql = "Select count(*) as incidentCount from "+incidentTableName+" where inc.ORIGINAL_INCIDENT_NUMBER  like '%" + incidentNumber + "%'";
+                    var childsql = "Select count(*) as CHILD_COUNT from "+incidentTableName+" join "+taskTable+" tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS not in (5,6)  and inc.ORIGINAL_INCIDENT_NUMBER  = '" + incidentNumber + "'";
                     //var childoutput = executeQuerySync(childsql);
                     var connection = getOracleDBConnectionRemedy( sync);
                     var childoutput = getOracleQueryResult(connection, childsql, sync);
@@ -268,8 +268,8 @@ module.exports = function () {
                     var childCount = 0;
 
                     if (childoutput != null && childoutput.rows != null) {
-                        console.log("child count for incident =>" + childoutput.rows[0].incidentCount);
-                        childCount = childoutput.rows[0].incidentCount;
+                        console.log("child count for incident =>" + childoutput.rows[0].CHILD_COUNT);
+                        childCount = childoutput.rows[0].CHILD_COUNT;
                     }
                     //console.log("checking output condition");
                     if (output != null) {
@@ -280,14 +280,14 @@ module.exports = function () {
                         }
                         if (output.rows.length == 0) {
                             //console.log("in not found message.");
-                            outputText = "<b>Sorry, no result can be found against given incident number " + incident_no_str + ". Please provide with a different incident number.</b>";
+                            outputText = "<b>Sorry, no result can be found against given incident number " + incidentNumber + ". Please provide with a different incident number.</b>";
                         } else {
-                            console.log("incident" + incident_no_str + " found");
+                            console.log("incident" + incidentNumber + " found");
                         }
 
                     } else {
                         //console.log("out put is null");
-                        outputText = "<b>Sorry, no result can be found against given incident number " + incident_no_str + " in remedy. Please provide with a different incident number.</b>";
+                        outputText = "<b>Sorry, no result can be found against given incident number " + incidentNumber + " in remedy. Please provide with a different incident number.</b>";
                     }
                 } else {
                     //console.log("last else =>");

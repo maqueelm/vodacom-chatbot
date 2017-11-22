@@ -1,6 +1,7 @@
 module.exports = function () {
 var excelbuilder = require('msexcel-builder');
 var S = require('string');
+require('./stringhandler')();
 var excelGenerationRecordCountLimit = 10;
 var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
 var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
@@ -123,7 +124,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 
  this.orchestrateBotResponseTextForIncident = function (dbQueryResult, outputText, response, childCount) {
     console.log("orchestrateBotResponseTextForIncident = >Length of rows =>" + dbQueryResult.length);
-	console.log ("dbQueryResult =>" + JSON.stringify(dbQueryResult));
+	//console.log ("dbQueryResult =>" + JSON.stringify(dbQueryResult));
 	if (dbQueryResult != null && dbQueryResult.length == 0) {
 		outputText = "Sorry, no result can be found against given incident number.";
 	}
@@ -162,7 +163,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 		} else {
 			response.context.cxt_is_master_incident = false;
 			response.context.cxt_parent_incident_number = dbQueryResult[0].PARENT_INCIDENT_NUMBER;
-			outputText += "<br/> I found that " + dbQueryResult[0].INCIDENT_NUMBER + " child of "+ dbQueryResult[0].RELATIONSHIP_TYPE + "incident " + dbQueryResult[0].PARENT_INCIDENT_NUMBER + ". if you like to see the detail of "+ dbQueryResult[0].RELATIONSHIP_TYPE + " incident, reply with <b>yes</b>.";
+			outputText += "<br/> I found that " + dbQueryResult[0].INCIDENT_NUMBER + " is "+ dbQueryResult[0].RELATIONSHIP_TYPE + " of " + dbQueryResult[0].PARENT_INCIDENT_NUMBER + ". If you like to see the detail of master incident, reply with <b>yes</b>.";
 
 		}
 
@@ -180,7 +181,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 	var childIncidentCount = 0;
 	if (dbQueryResult != null) {
 
-		var masterIncidentCountsql = "Select distinct(inc.INCIDENT_NUMBER),count(*) as MASTERCOUNT from "+incidentTableName+" where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER  is null and inc.STATUS not in (5,6) group by inc.INCIDENT_NUMBER";
+		var masterIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as MASTERCOUNT from "+incidentTableName+" where LOWER(inc.region) = '" + regionName_2.toLowerCase() + "' and inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS not in (5,6)";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
         //var masterIncidentCountResult = executeQuerySync(masterIncidentCountsql);
         var connection = getOracleDBConnectionRemedy(sync);
@@ -188,8 +189,9 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
         doRelease(connection);
 		//console.log("masterIncidentCountResult=>"+JSON.stringify(masterIncidentCountResult));
 		masterIncidentCount = masterIncidentCountResult.rows[0].MASTERCOUNT;
-
-		var childIncidentCountsql = "Select count(*) as CHILDCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.region like '%" + regionName_2 + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
+		// association type 1 = child , 0 = master, null = standalone
+		var childIncidentCountsql = "Select count(*) as CHILDCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER and inc_2.INCIDENT_ASSOCIATION_TYPE  = 1) where LOWER(inc.region) = '" + regionName_2.toLowerCase() + "' and inc.STATUS not in (5,6) ";//and inc_2.STATUS not in (5,6)
+		//var childIncidentCountsql = "Select count(*) as CHILDCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where LOWER(inc.region) like '%" + regionName_2.toLowerCase() + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
         console.log("childIncidentCountsql =>" + childIncidentCountsql);
         var connection = getOracleDBConnectionRemedy(sync);
 		var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);
@@ -463,7 +465,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 	if (dbQueryResult != null) {
 		data.context.cxt_tx_found_incident_count = dbQueryResult[0].INCIDENTCOUNT;
 		var cause_tier_1 = data.context.cxt_tx_name;
-		var masterIncidentCountsql = "Select count(*) as MASTER_COUNT from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and ORIGINAL_INCIDENT_NUMBER is null and inc.STATUS not in (5,6)";
+		var masterIncidentCountsql = "Select count(*) as MASTER_COUNT from "+incidentTableName+" where inc.GENERIC_CATEGORIZATION_TIER_2 like '" + cause_tier_1 + "' and ORIGINAL_INCIDENT_NUMBER is null and inc.STATUS not in (5,6)";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
 		var connection = getOracleDBConnectionRemedy(sync);
         var masterIncidentCountResult = getOracleQueryResult(connection, masterIncidentCountsql,sync);
@@ -472,7 +474,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 			masterIncidentCount = masterIncidentCountResult.rows[0].MASTER_COUNT;
 
 		//var childIncidentCountsql = "Select count(*) as childCount from incidents where cause_tier_1 like '" + cause_tier_1 + "' and PARENT_INCIDENT_NUMBER is not null and LOWER(status) != 'closed'";
-		var childIncidentCountsql = "Select count(*) as CHILD_COUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.PARENT_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and inc_2.GENERIC_CATEGORIZATION_TIER_1 like '" + cause_tier_1 + "' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
+		var childIncidentCountsql = "Select count(*) as CHILD_COUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.PARENT_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where inc.GENERIC_CATEGORIZATION_TIER_2 like '" + cause_tier_1 + "' and inc_2.GENERIC_CATEGORIZATION_TIER_2 like '" + cause_tier_1 + "' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
 		console.log("childIncidentCountsql =>" + childIncidentCountsql);
 		var connection = getOracleDBConnectionRemedy(sync);
 		var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql,sync);
@@ -536,7 +538,7 @@ var incidentTableJoinTaskTable   = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NU
 	sheet1.set(4, 1, 'Site Name');
 	var j = 0;
 	var numberOfRowsNew = Number(numberOfRows) + Number(2);
-	console.log("excel query result =>"+JSON.stringify(dbQueryResult));
+	//console.log("excel query result =>"+JSON.stringify(dbQueryResult));
 	for (var i = 2; i < numberOfRowsNew; i++) {
 		//sheet1.set(col, row, data);
 		//console.log(i);
