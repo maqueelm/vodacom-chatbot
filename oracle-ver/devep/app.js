@@ -433,6 +433,9 @@ app.post('/api/message', function (req, res) {
 					data.context.cxt_matched_customer_count = 0;
 					data.context.cxt_customer_flow_node_detail_query_executed = false;
 					data.context.cxt_customer_flow_vlan_id = null;
+					data.context.cxt_user_selected_customer = null;
+					data.context.cxt_customer_query = null;
+					cxt_customer_drill_down_region = null;
 					// this below code will handle if user ask another customer after one customer flow ends.
 					for (i = 0; i < data.entities.length; i++) {
 
@@ -456,7 +459,7 @@ app.post('/api/message', function (req, res) {
 					console.log("Customer List Length=>" + customerList.length);
 					for (i = 0; i < customerList.length; i++) {
 
-						inOperatorCustomer += "'" + customerList[i].value.toLowerCase() + "'";
+						inOperatorCustomer += "'" + customerList[i].value + "'";
 
 						if (i < customerList.length - 1) {
 							inOperatorCustomer += ",";
@@ -466,7 +469,7 @@ app.post('/api/message', function (req, res) {
 					}
 
 
-					var sql = "Select MPLSVPN_NAME,IFACE_VLANID,NID from  tellabs_ods.ebu_vlan_status_v where LOWER(MPLSVPN_NAME) in  (" + inOperatorCustomer + ") ";
+					var sql = "Select MPLSVPN_NAME,IFACE_VLANID,NID from  tellabs_ods.ebu_vlan_status_v where MPLSVPN_NAME in  (" + inOperatorCustomer + ") ";
 					data.context.cxt_customer_query = sql;
 					console.log("Customer SQL so far =>" + sql);
 				}
@@ -521,7 +524,7 @@ app.post('/api/message', function (req, res) {
 					doRelease(connection);
 
 					var nodeId = null;
-					if (output != null && output.rows != null) {
+					if (output != null && output.rows != null && output.rows.length >=1) {
 						nodeId = output.rows[0].NID;
 					}
 
@@ -539,18 +542,18 @@ app.post('/api/message', function (req, res) {
 
 						doRelease(connection);
 					}
-					//console.log(output.data.rows);
-					//outputText = data.output.text[0];
+	
 					if (nodeOutput != null && nodeOutput.rows.length == 0) {
 
+						
 						outputText = "<br/><b>I could not find any incident data for this customer in Remedy. If you like to speak to an operator please dial 082918.<br/></b>";
-
+						console.log("incident data not found for customer=>"+outputText);
 
 						//data.context.cxt_show_customer_selected_name = null;
 
 
 					} else {
-
+						console.log("incident data found for customer");
 						outputText = "<table class='w-100'>";
 						outputText += "<tr><th>INCIDENT NUMBER</th><th>DESCRIPTION</th><th>STATUS</th><th>SITE NAME</th></tr>";
 						for (i = 0; i < nodeOutput.rows.length; i++) {
@@ -569,6 +572,7 @@ app.post('/api/message', function (req, res) {
 					outputText = addFeedbackButton(outputText);
 					outputText += data.output.text[0]; // what else i can do for you message.
 					
+					
 
 				}
 
@@ -584,15 +588,11 @@ app.post('/api/message', function (req, res) {
 					/*Incident Intent Handling.*/
 					outputText = handleIncidentIntent(data, inputText, outputText, incidentFlow, sync);
 
-
-					/*Region Intent Handling.*/
-					outputText = handleRegionIntent(data, inputText, outputText, sync);
-
-
-
 					/*Corporate Customer Intent handling.*/
 					outputText = handleCustomerIntent(data, inputText, outputText, incidentFlow, sync);
 
+					/*Region Intent Handling.*/
+					outputText = handleRegionIntent(data, inputText, outputText, sync);
 
 					/*
 						transmission failure Intent handling.

@@ -97,140 +97,129 @@ module.exports = function () {
     }
 
     this.handleCustomerIntent = function (data, inputText, outputText, incidentFlow, sync) {
+        // console.log("data.context.cxt_show_customer_selected_name=>"+data.context.cxt_show_customer_selected_name);
+        // console.log("data.intents[0].intent =>"+data.intents[0].intent);
+        var isValidCustomerIntent = false;
+        if (data != null && data.entities != null) {
+            for (i = 0; i < data.entities.length; i++) {
 
-        if (data != null && data.intents[0] == 'corporate-customer' || data.context.cxt_show_customer_selected_name == null) {
+                if (data.entities[i] != null && data.entities[i].entity == 'corporate-customers') {
+                    isValidCustomerIntent = true;
+                }
+            }
+        }
 
-            if (!incidentFlow) { // if someone search customer with query like status of customer name then this check will handle the triggering of customer.
-                console.log("handleCustomerIntent");
+        console.log("isValidCustomerIntent=>"+isValidCustomerIntent);
+        if (data != null && data.context.cxt_user_selected_customer == null && isValidCustomerIntent) {
 
-                //&& data.entities[0] != null && data.entities[0].entity == "corporate-customers" && data.entities[0].confidence > 0.5
-                //console.log(JSON.stringify(data.entities));
-                var customerName = null;
-                var customerCount = 0;
-                var customerList = [];
-                var siteCount = 0;
-                var regionName = null;
-                for (i = 0; i < data.entities.length; i++) {
+            var customerCount = 0;
+            var customerList = [];
+            var regionName = null;
+            for (i = 0; i < data.entities.length; i++) {
 
-                    if (data.entities[i] != null && data.entities[i].entity == 'corporate-customers') {
-                        //customerName = data.entities[i].value;
-                        //data.context.cxt_matched_customer_name = customerName;
-                        if (!containsValue(customerList, data.entities[i].value)) {
-                            customerList[i] = data.entities[i].value;
-                            customerCount++;
-                        }
-                    }
-                    if (data.entities[i] != null && data.entities[i].entity == 'regions') {
-                        regionName = data.entities[i].value;
+                if (data.entities[i] != null && data.entities[i].entity == 'corporate-customers') {
+
+                    if (!containsValue(customerList, data.entities[i].value)) {
+                        customerList[i] = data.entities[i].value;
+                        customerCount++;
                     }
                 }
-
-
-                data.context.cxt_matched_customer_list = customerList;
-                // console.log(JSON.stringify(customerList));
-                console.log("customer count =>" + customerCount);
-                // console.log("site count =>" + siteCount);
-                //console.log(JSON.stringify(data));
-                var inOperatorCustomer = '';
-                if (customerCount >= 1) {
-                    for (i = 0; i < customerList.length; i++) {
-
-
-                        inOperatorCustomer += "'" + customerList[i] + "'";
-                        if (i < customerList.length - 1) {
-                            inOperatorCustomer += ",";
-                        }
-
-
-
-                    }
-
-
-                    var sql = "Select MPLSVPN_NAME from  tellabs_ods.ebu_vlan_status_v where LOWER(MPLSVPN_NAME) in  (" + inOperatorCustomer + ") ";
-
-
-                    if (regionName != null) {
-
-                        sql += "AND LOWER(MPLSVPN_NAME) like '%" + regionName.toLowerCase() + "%'"
-                        console.log("customer sql =>" + sql);
-                       
-                        if (output != null && output.rows != null && output.rows.length == 0) {
-                            //console.log("customer name fetched from DB=>" + output.rows);
-                            // will look for incident data.
-                        } else {
-
-
-                        }
-
-                    }
-
-                    var connection = getOracleDBConnection(sync);
-                    var output = getOracleQueryResult(connection, sql, sync);
-                    doRelease(connection);
-
-                    if (customerCount == 1) {
-
-                        data.context.cxt_user_selected_customer = data.context.cxt_matched_customer_list[0];
-                    }
-
-                    outputText = orchestrateBotResponseTextForCustomer(customerCount, data,regionName);
-
-
-                    
-
+                if (data.entities[i] != null && data.entities[i].entity == 'regions') {
+                    regionName = data.entities[i].value;
                 }
             }
 
+
+            data.context.cxt_matched_customer_list = customerList;
+            // console.log(JSON.stringify(customerList));
+            console.log("customer count =>" + customerCount);
+            var inOperatorCustomer = '';
+            if (customerCount >= 1) {
+                console.log("handleCustomerIntent");
+                for (i = 0; i < customerList.length; i++) {
+                    inOperatorCustomer += "'" + customerList[i] + "'";
+                    if (i < customerList.length - 1) {
+                        inOperatorCustomer += ",";
+                    }
+                }
+                var output = null;
+                if (regionName != null) {
+
+                    var sql = "Select MPLSVPN_NAME from  tellabs_ods.ebu_vlan_status_v where MPLSVPN_NAME in  (" + inOperatorCustomer + ") ";
+                    sql += "AND LOWER(MPLSVPN_NAME) like '%" + regionName.toLowerCase() + "%'"
+                    console.log("customer sql =>" + sql);
+                    var connection = getOracleDBConnection(sync);
+                    output = getOracleQueryResult(connection, sql, sync);
+                    doRelease(connection);
+                    if (output != null && output.rows != null) {
+                        customerCount = output.rows.length;
+                    }
+                }
+                if (customerCount == 1) {
+                    data.context.cxt_user_selected_customer = data.context.cxt_matched_customer_list[0];
+                }
+                outputText = orchestrateBotResponseTextForCustomer(customerCount, data, regionName);
+            }
         }
+        // handling regiona and customer name case
+
+
 
         return outputText;
 
     }
 
     this.handleRegionIntent = function (data, inputText, outputText, sync) {
+        console.log("checking region entities =>" + JSON.stringify(data.entities));
+        var isValidRegionIntentCase = true;
+        var regionName = null;
+        if (data != null && data.entities != null) {
 
-        if (data != null && data.entities != null && data.entities[0] != 'escalation' && data.context.cxt_matched_customer_count == 0 && (data.intents[0] != null && data.intents[0].intent == "regions" && data.intents[0].confidence > 0.5)) {
-
-            if (data.entities != null && data.entities.length <= 3
-
-                && ((data.entities[0] != null && data.entities[0].entity == "regions") || (data.entities[1] != null && data.entities[1].entity == "regions") || (data.entities[0] != null && data.entities[0].entity == "sys-location" || data.entities[1] != null && data.entities[1].entity == "sys-location"))
-
-            ) {
-                console.log("handleRegionIntent");
-                var regionName_1 = "";
-                var fullName = "";
-                console.log(JSON.stringify(data.entities));
-                for (i = 0; i < data.entities.length; i++) {
-                    if (data.entities[i].entity == 'regions') {
-                        regionName_1 = data.entities[i].value;
-                    }
-                }
-                /* if (data.entities[0] != null && data.entities[0].entity != "escalation" && data.entities[0].entity != "incidents" && data.entities[0].entity != "summary") {
-                     regionName_1 = data.entities[0].value;
-                 } else {
- 
-                     regionName_1 = data.entities[1].value;
-                 }*/
-                data.context.cxt_region_name = regionName_1;
-                console.log("region name =>" + regionName_1);
-                if (regionName_1 != "region") {
-                    var regionLookupQuery = "Select * from region_lookup where (LOWER(abbreviation) = '" + regionName_1.toLowerCase() + "' OR LOWER(full_name) = '" + regionName_1.toLowerCase() + "')";
-                    console.log("lookup query =>" + regionLookupQuery);
-                    var lookupResult = executeQuerySync(regionLookupQuery);
-                    if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows[0] != null) {
-                        regionName_1 = lookupResult.data.rows[0].full_name;
-                    }
-                    data.context.cxt_region_full_name = regionName_1;
-                    var regionName_2 = S(regionName_1).replaceAll('Africa', "").s;
-                    regionName_2 = S(regionName_2).replaceAll('africa', "").s;
-                    regionName_2 = S(regionName_2).s;
-                    outputText = orchestrateBotResponseTextForRegion(null, data.output.text, regionName_1, data, sync);
-
-                } else {
-                    outputText = "Sorry, you have not provided a region name.";
-                }
-                //console.log(JSON.stringify(data));
+            if (!data.context.cxt_region_show_isolated_fault && data.context.cxt_location_name_region_flow == null){
+                isValidRegionIntentCase = true;
+            } else {
+                isValidRegionIntentCase = false; 
             }
+
+            for (i = 0; i < data.entities.length; i++) {
+                if (data.entities[i].entity == 'escalation' || data.entities[i].entity == "corporate-customers") {
+                    isValidRegionIntentCase = false;
+                }
+                if (data.entities[i].entity == 'regions' || data.entities[i].entity == "sys-location") {
+                    regionName = data.entities[i].value;
+                }
+
+            }
+        }
+
+        
+
+        console.log("region name =>" + regionName);
+        console.log("isValidRegionIntentCase =>" + isValidRegionIntentCase);
+        console.log("data.context.cxt_matched_customer_count =>" + data.context.cxt_matched_customer_count);
+
+        if (data != null && data.entities != null && isValidRegionIntentCase && regionName != null && data.context.cxt_matched_customer_count == 0 ) {
+
+            /*  if (data.entities != null && data.entities.length <= 3
+  
+                  && ((data.entities[0] != null && data.entities[0].entity == "regions") || (data.entities[1] != null && data.entities[1].entity == "regions") || (data.entities[0] != null && data.entities[0].entity == "sys-location" || data.entities[1] != null && data.entities[1].entity == "sys-location"))
+  
+              ) {*/
+            console.log("handleRegionIntent");
+            data.context.cxt_region_name = regionName;
+            var fullName = "";
+          
+            var regionLookupQuery = "Select * from region_lookup where (LOWER(abbreviation) = '" + regionName.toLowerCase() + "' OR LOWER(full_name) = '" + regionName.toLowerCase() + "')";
+            console.log("lookup query =>" + regionLookupQuery);
+            var lookupResult = executeQuerySync(regionLookupQuery);
+            if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows[0] != null) {
+                regionName = lookupResult.data.rows[0].full_name;
+            }
+            data.context.cxt_region_full_name = regionName;
+            /* var regionName_2 = S(regionName).replaceAll('Africa', "").s;
+             regionName_2 = S(regionName_2).replaceAll('africa', "").s;
+             regionName_2 = S(regionName_2).s; */
+            outputText = orchestrateBotResponseTextForRegion(null, data.output.text, regionName, data, sync);
         }
 
         return outputText;
