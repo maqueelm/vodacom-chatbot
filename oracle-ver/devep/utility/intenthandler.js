@@ -1,5 +1,11 @@
 module.exports = function () {
-
+    var workspaceId = "8124c390-c801-4bcf-8439-f6875d09ab23";
+    var Conversation = require("watson-developer-cloud/conversation/v1");
+    var conversation = new Conversation({
+        username: "8ed4fefa-9d78-4374-92ca-e75319d53244",
+        password: "ejsumaR2Noi6",
+        version_date: '2017-05-26'
+    });
     var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
     var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
     var taskTable = "ARADMIN.TMS_TASK";
@@ -97,7 +103,7 @@ module.exports = function () {
     }
 
     this.handleCustomerIntent = function (data, inputText, outputText, incidentFlow, sync) {
-        // console.log("data.context.cxt_show_customer_selected_name=>"+data.context.cxt_show_customer_selected_name);
+        // console.log("data.context.cxt_corporate_site_input=>"+data.context.cxt_corporate_site_input);
         // console.log("data.intents[0].intent =>"+data.intents[0].intent);
         var isValidCustomerIntent = false;
         if (data != null && data.entities != null) {
@@ -107,32 +113,42 @@ module.exports = function () {
                     isValidCustomerIntent = true;
                 }
             }
+
+            if (data.context.cxt_customer_drill_down_region != null) {
+                isValidCustomerIntent = true;
+            }
         }
 
-        console.log("isValidCustomerIntent=>"+isValidCustomerIntent);
+        //console.log("isValidCustomerIntent=>" + isValidCustomerIntent);
+        //console.log("data.context.cxt_user_selected_customer=>" + data.context.cxt_user_selected_customer);
         if (data != null && data.context.cxt_user_selected_customer == null && isValidCustomerIntent) {
 
             var customerCount = 0;
             var customerList = [];
             var regionName = null;
-            for (i = 0; i < data.entities.length; i++) {
+            var customerInputText = data.context.cxt_customer_input_text;
+           // console.log("customerInputText=>" + JSON.stringify(customerInputText));
+            if (data.entities.length > 0) {
 
-                if (data.entities[i] != null && data.entities[i].entity == 'corporate-customers') {
+                for (i = 0; i < data.entities.length; i++) {
 
-                    if (!containsValue(customerList, data.entities[i].value)) {
+                    if (data.entities[i] != null && data.entities[i].entity == 'corporate-customers') {
                         customerList[i] = data.entities[i].value;
                         customerCount++;
                     }
-                }
-                if (data.entities[i] != null && data.entities[i].entity == 'regions') {
-                    regionName = data.entities[i].value;
+                    if (data.entities[i] != null && data.entities[i].entity == 'regions') {
+                        regionName = data.entities[i].value;
+                    }
                 }
             }
 
 
-            data.context.cxt_matched_customer_list = customerList;
-            // console.log(JSON.stringify(customerList));
-            console.log("customer count =>" + customerCount);
+            if (customerCount > 0) {
+                data.context.cxt_matched_customer_list = customerList;
+            }
+
+
+            
             var inOperatorCustomer = '';
             if (customerCount >= 1) {
                 console.log("handleCustomerIntent");
@@ -142,27 +158,77 @@ module.exports = function () {
                         inOperatorCustomer += ",";
                     }
                 }
+                var sql = "Select DISTINCT MPLSVPN_NAME,IFACE_VLANID from  tellabs_ods.ebu_vlan_status_mv"
+                if (customerInputText == null) {
+                    sql += " where MPLSVPN_NAME like  (" + inOperatorCustomer + ")  AND IFACE_VLANID > 0 ";
+                } else {
+                    data.context.cxt_customer_input_text = customerInputText;
+                    customerInputText = S(customerInputText).replaceAll(' ', '%').s; // replacing space with % for like query
+                    sql += " where LOWER(MPLSVPN_NAME) like '%" + customerInputText.toLowerCase() + "%' AND IFACE_VLANID > 0";
+                }
                 var output = null;
                 if (regionName != null) {
 
-                    var sql = "Select MPLSVPN_NAME from  tellabs_ods.ebu_vlan_status_v where MPLSVPN_NAME in  (" + inOperatorCustomer + ") ";
-                    sql += "AND LOWER(MPLSVPN_NAME) like '%" + regionName.toLowerCase() + "%'"
-                    console.log("customer sql =>" + sql);
-                    var connection = getOracleDBConnection(sync);
-                    output = getOracleQueryResult(connection, sql, sync);
-                    doRelease(connection);
-                    if (output != null && output.rows != null) {
-                        customerCount = output.rows.length;
-                    }
+
+                    sql += " AND LOWER(REGION) = '" + regionName.toLowerCase() + "'";
                 }
-                if (customerCount == 1) {
+                //console.log("customer sql =>" + sql);
+                var connection = getOracleDBConnection(sync);
+                output = getOracleQueryResult(connection, sql, sync);
+                doRelease(connection);
+                if (output != null && output.rows != null) {
+
+                    customerCount = output.rows.length;
+                }
+                data.context.cxt_customer_query = sql;
+                /*if (customerCount == 1) {
                     data.context.cxt_user_selected_customer = data.context.cxt_matched_customer_list[0];
-                }
+                }*/
                 outputText = orchestrateBotResponseTextForCustomer(customerCount, data, regionName);
+            } else {
+               // outputText = "No customer found with the given name.";
             }
+       
+        }
+
+       // console.log("data.entities.length=>"+JSON.stringify(data.entities.length));
+
+        if (data!=null && data.context.cxt_customer_input_text != null && data.entities.length == 0) {
+
+            var sql = "Select DISTINCT MPLSVPN_NAME,IFACE_VLANID from  tellabs_ods.ebu_vlan_status_v";
+            
+            customerInputText = S(data.context.cxt_customer_input_text).replaceAll(' ', '%').s; // replacing space with % for like query
+            
+            sql += " where LOWER(MPLSVPN_NAME) like '%" + customerInputText.toLowerCase() + "%' AND IFACE_VLANID > 0"; 
+            
+            console.log("unknown customer sql =>" + sql);
+            
+            var connection = getOracleDBConnection(sync);
+            
+            output = getOracleQueryResult(connection, sql, sync);
+            
+            doRelease(connection);
+            
+            if (output != null && output.rows != null) {
+            
+                // add learning code here.
+                if(customerInputText != null) {
+                    // Adding to watson training.
+                    customerInputText = S(customerInputText).replaceAll('%', ' ').s; // replacing % with space for like query
+                    console.log("Adding entity=>"+customerInputText);
+                    createEntityValue(customerInputText,"corporate-customers");
+                }
+                customerCount = output.rows.length;
+            }
+            data.context.cxt_customer_query = sql;
+           /* if (customerCount == 1) {
+                data.context.cxt_user_selected_customer = output.rows[0].MPLSVPN_NAME;
+            }*/
+            outputText = orchestrateBotResponseTextForCustomer(customerCount, data, regionName);
+            data.context.cxt_customer_input_text = null;
         }
         // handling regiona and customer name case
-
+  
 
 
         return outputText;
@@ -170,35 +236,38 @@ module.exports = function () {
     }
 
     this.handleRegionIntent = function (data, inputText, outputText, sync) {
-        console.log("checking region entities =>" + JSON.stringify(data.entities));
+        // console.log("checking region entities =>" + JSON.stringify(data.entities));
         var isValidRegionIntentCase = true;
         var regionName = null;
         if (data != null && data.entities != null) {
 
-            if (!data.context.cxt_region_show_isolated_fault && data.context.cxt_location_name_region_flow == null){
+            if (!data.context.cxt_region_show_isolated_fault && data.context.cxt_location_name_region_flow == null) {
                 isValidRegionIntentCase = true;
             } else {
-                isValidRegionIntentCase = false; 
+                isValidRegionIntentCase = false;
             }
 
             for (i = 0; i < data.entities.length; i++) {
-                if (data.entities[i].entity == 'escalation' || data.entities[i].entity == "corporate-customers") {
+                if (data.entities[i].entity == 'escalation' || data.entities[i].entity == "corporate-customers" || data.entities[i].entity == "2g-sites") {
                     isValidRegionIntentCase = false;
                 }
                 if (data.entities[i].entity == 'regions' || data.entities[i].entity == "sys-location") {
                     regionName = data.entities[i].value;
+                    isValidRegionIntentCase = true;
+                } else {
+                    isValidRegionIntentCase = false;
                 }
 
             }
         }
 
-        
+
 
         console.log("region name =>" + regionName);
         console.log("isValidRegionIntentCase =>" + isValidRegionIntentCase);
         console.log("data.context.cxt_matched_customer_count =>" + data.context.cxt_matched_customer_count);
 
-        if (data != null && data.entities != null && isValidRegionIntentCase && regionName != null && data.context.cxt_matched_customer_count == 0 ) {
+        if (data != null && data.entities != null && isValidRegionIntentCase && regionName != null && data.context.cxt_customer_drill_down_region == null) {
 
             /*  if (data.entities != null && data.entities.length <= 3
   
@@ -208,7 +277,7 @@ module.exports = function () {
             console.log("handleRegionIntent");
             data.context.cxt_region_name = regionName;
             var fullName = "";
-          
+
             var regionLookupQuery = "Select * from region_lookup where (LOWER(abbreviation) = '" + regionName.toLowerCase() + "' OR LOWER(full_name) = '" + regionName.toLowerCase() + "')";
             console.log("lookup query =>" + regionLookupQuery);
             var lookupResult = executeQuerySync(regionLookupQuery);
@@ -231,7 +300,7 @@ module.exports = function () {
         var goToIncidentIntent = false;
 
 
-        if (data.context.cxt_location_name_trx_flow == null && data.context.cxt_tx_name == null && data.context.cxt_region_name == null && data.context.cxt_matched_customer_count == 0 && data.context.cxt_ci_flow_site_name == null && data.context.cxt_customer_flow_vlan_id == null) {
+        if (data.context.cxt_location_name_trx_flow == null && data.context.cxt_tx_name == null && data.context.cxt_region_name == null && data.context.cxt_customer_query == null && data.context.cxt_ci_flow_site_name == null && data.context.cxt_customer_flow_vlan_id == null) {
             goToIncidentIntent = true;
             if (data.entities[0] != null && data.entities[0].entity == '2g-sites') {
                 goToIncidentIntent = false;
@@ -402,6 +471,52 @@ module.exports = function () {
         return outputText;
 
     }
+
+   
+
+    
+
+    
+    function createEntityValue(val,entityName) {
+        var params = {
+            workspace_id: workspaceId,
+            entity: entityName,
+            value: val
+          };
+    
+        conversation.createValue(params, function(err, response) {
+            if (err) {
+              console.error(err);
+            } else {
+              console.log(JSON.stringify(response, null, 2));
+              var res = val.split(" ");
+              for(i=0; i<res.length; i++) {
+                createSynonymsForValue(val,entityName,res[i]);
+              }
+            }
+          
+          });
+    
+    
+    }
+    
+    function createSynonymsForValue(val,entityName,synonymVal) { 
+      var params = {
+        workspace_id: workspaceId,
+        entity: entityName,
+        value: val,
+        synonym: synonymVal
+      };
+     conversation.createSynonym(params, function(err, response) {   
+        if (err) {
+          console.error(err);
+        } else {
+          console.log(JSON.stringify(response, null, 2));
+        }
+      
+      });
+    }   
+    
 
 
 };

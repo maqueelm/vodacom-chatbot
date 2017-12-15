@@ -313,7 +313,7 @@ app.post('/api/message', function (req, res) {
 
 					}
 					if (!data.context.cxt_site_name_region_flow_found && !data.context.cxt_site_name_region_show_incident_detail && !data.context.cxt_region_flow_search_for_location) {
-						outputText = "Site name <b>not</b> found do you want to search with location? reply with <b>yes</b>.";
+						outputText = "Site name <b>not</b> found do you want to search with location? reply with <b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >yes</a></b>.";
 						data.context.cxt_region_flow_search_for_location = true;
 						data.context.cxt_site_name_region_flow = null;
 					}
@@ -432,10 +432,12 @@ app.post('/api/message', function (req, res) {
 					data.context.cxt_customer_query = null;
 					data.context.cxt_matched_customer_count = 0;
 					data.context.cxt_customer_flow_node_detail_query_executed = false;
+					data.context.cxt_customer_show_incident_data = false;
 					data.context.cxt_customer_flow_vlan_id = null;
 					data.context.cxt_user_selected_customer = null;
 					data.context.cxt_customer_query = null;
-					cxt_customer_drill_down_region = null;
+					data.context.cxt_customer_drill_down_region = null;
+					data.context.cxt_customer_input_text = null;
 					// this below code will handle if user ask another customer after one customer flow ends.
 					for (i = 0; i < data.entities.length; i++) {
 
@@ -449,84 +451,88 @@ app.post('/api/message', function (req, res) {
 
 
 				}
-				//console.log("i am here 8");
-				if (data != null && data.context.cxt_matched_customer_list != null && data.context.cxt_customer_query == null) {
-
-					console.log("data.context.cxt_customer_flow_found=>" + data.context.cxt_customer_flow_found);
-					var customerList = data.context.cxt_matched_customer_list;
-					console.log("customer list from context variable=>" + JSON.stringify(customerList));
-					var inOperatorCustomer = '';
-					console.log("Customer List Length=>" + customerList.length);
-					for (i = 0; i < customerList.length; i++) {
-
-						inOperatorCustomer += "'" + customerList[i].value + "'";
-
-						if (i < customerList.length - 1) {
-							inOperatorCustomer += ",";
-						}
-
-
-					}
-
-
-					var sql = "Select MPLSVPN_NAME,IFACE_VLANID,NID from  tellabs_ods.ebu_vlan_status_v where MPLSVPN_NAME in  (" + inOperatorCustomer + ") ";
-					data.context.cxt_customer_query = sql;
-					console.log("Customer SQL so far =>" + sql);
-				}
-
-				if (data.context.cxt_user_selected_customer == null && data.context.cxt_customer_query != null && data.context.cxt_customer_drill_down_region != null) {
+				
+				console.log("context variables set =>"+JSON.stringify(data.context));
+				if (data.context.cxt_user_selected_customer == null && data.context.cxt_customer_query != null && data.context.cxt_customer_drill_down_region != null && data.context.cxt_incident_data_for_customer) {
 
 					var sql = data.context.cxt_customer_query;
-					sql += " AND LOWER(MPLSVPN_NAME) like '%" + data.context.cxt_customer_drill_down_region.toLowerCase() + "%'"
-					console.log("Customer SQL so far =>" + sql);
+					sql += " AND LOWER(REGION) = '" + data.context.cxt_customer_drill_down_region.toLowerCase() + "'"
+					console.log("Customer Query When region is specified in start =>" + sql);
 					var connection = getOracleDBConnection(sync);
 					var listOfCustomerOutput = getOracleQueryResult(connection, sql, sync);
 					doRelease(connection);
 					var matchedCustomerOnRegion = "<table class='w-50'><tr>";
 					var customerArr = [];
+					data.context.cxt_matched_customer_count = listOfCustomerOutput.rows.length;
+					if (listOfCustomerOutput.rows.length > 0) {
 
-					//if (listOfCustomerOutput.rows.length > 0) {
-					
-					for (i = 0; i < listOfCustomerOutput.rows.length; i++) {
-						//console.log("checking duplicates");
-						//if (!containsValue(customerArr, listOfCustomerOutput.rows[i].MPLSVPN_NAME)) {
-							customerArr[i]=listOfCustomerOutput.rows[i].MPLSVPN_NAME
+						for (i = 0; i < listOfCustomerOutput.rows.length; i++) {
+							customerArr[i] = listOfCustomerOutput.rows[i].MPLSVPN_NAME
 							matchedCustomerOnRegion += "<tr>";
-							matchedCustomerOnRegion += "<td>" + listOfCustomerOutput.rows[i].MPLSVPN_NAME + "</td>";
+							matchedCustomerOnRegion += "<td><a href='#' id='c_" + i + "' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + listOfCustomerOutput.rows[i].MPLSVPN_NAME + "</a></td>";
 							matchedCustomerOnRegion += "<td>" + listOfCustomerOutput.rows[i].IFACE_VLANID + "</td>";
 							matchedCustomerOnRegion += "</tr>";
-						//} else {
-						///	console.log("value exists");
-						//}
 
 
+
+						}
+						matchedCustomerOnRegion += "</table>";
+
+						console.log("outputText=>" + data.output.text[0]);
+
+						outputText = S(data.output.text[0]).replaceAll('[region_filtered_customer_list]', matchedCustomerOnRegion).s;
+					} else {
+						outputText = "<br/><b>Sorry no result found for specified customer in " + data.context.cxt_customer_drill_down_region + ".<br/> Reply with yes to search again.</b>";
+						data.context.cxt_incident_data_for_customer = false;
 					}
-					matchedCustomerOnRegion += "</table>";
-
-					console.log("outputText=>" + data.output.text[0]);
-
-					outputText = S(data.output.text[0]).replaceAll('[region_filtered_customer_list]',  matchedCustomerOnRegion).s;
-				//} else {
-				//	outputText = "<b>Sorry no customer available for this region.</b>";
-				//}
 
 				}
-
+				// when customer is picked up from the list of customers returned by watson or db
 				if (data.context.cxt_user_selected_customer != null) {
 
 					//var sql = data.context.cxt_customer_query;
 					// show incident data here for selected customer.
-					var sql = "Select NID from  tellabs_ods.ebu_vlan_status_v where LOWER(MPLSVPN_NAME) = '" + data.context.cxt_user_selected_customer.toLowerCase() + "'"
-					data.context.cxt_customer_flow_node_detail_query_executed = true; // this flag will help to clear the context variables for customer.
+					var sql = "Select NID,MPLSVPN_NAME,IFNR,IFALIAS,IFACCURSTRING,NODE_NM from  tellabs_ods.ebu_vlan_status_mv where LOWER(MPLSVPN_NAME) = '" + data.context.cxt_user_selected_customer.toLowerCase() + "'"
 					console.log(sql);
 					var connection = getOracleDBConnection(sync);
 					var output = getOracleQueryResult(connection, sql, sync);
 					doRelease(connection);
-
+					console.log("node count for customer =>" + output.rows.length);
 					var nodeId = null;
-					if (output != null && output.rows != null && output.rows.length >=1) {
+					if (output != null && output.rows != null && output.rows.length >= 1) {
+
+						nodeId = output.rows[0].NID;
+						outputText = "<table class='w-50'><tr>";
+						for (i = 0; i < output.rows.length; i++) {
+							outputText += "<td>";
+							outputText += output.rows[i].MPLSVPN_NAME + "<br/>" + output.rows[i].IFNR + "<br/>" + output.rows[i].IFALIAS + "<br/>"
+								+ output.rows[i].IFACCURSTRING + "<br/>" + output.rows[i].NID + "<br/>" + output.rows[i].NODE_NM + "<br/><br/>";
+							outputText += "</td>";
+
+						}
+						outputText += "</tr></table>";
+						outputText += "Please reply with <b><a href='#' id='n_yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a></b> if you want <b>incident details</b> for these nodes otherwise reply with <b><a href='#' id='n_no' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>no</a></b>.";
+						//data.context.cxt_user_selected_customer = null;
+						data.context.node_output_query = sql;
+					}
+
+				}
+
+
+				if (data.context.cxt_customer_show_incident_data && data.context.node_output_query != null) {
+
+					data.context.cxt_customer_flow_node_detail_query_executed = true; // this flag will help to clear the context variables for customer.
+					data.context.cxt_customer_input_text = null;
+
+					var connection = getOracleDBConnection(sync);
+					var output = getOracleQueryResult(connection, data.context.node_output_query, sync);
+					doRelease(connection);
+					var nodeId = null;
+
+					if (output != null) {
 						nodeId = output.rows[0].NID;
 					}
+
 
 					var nodeOutput = null;
 					if (nodeId != null) {
@@ -539,16 +545,15 @@ app.post('/api/message', function (req, res) {
 						console.log(nodeSql);
 						var connection = getOracleDBConnectionRemedy(sync);
 						nodeOutput = getOracleQueryResult(connection, nodeSql, sync);
-
 						doRelease(connection);
 					}
-	
+
 					if (nodeOutput != null && nodeOutput.rows.length == 0) {
 
-						
-						outputText = "<br/><b>I could not find any incident data for this customer in Remedy. If you like to speak to an operator please dial 082918.<br/></b>";
-						console.log("incident data not found for customer=>"+outputText);
 
+						outputText = "<br/><b>I could not find any incident data for this customer in Remedy. If you like to speak to an operator please dial 082918.<br/></b>";
+						//console.log("incident data not found for customer=>" + outputText);
+						data.context.cxt_incident_data_for_customer = false;
 						//data.context.cxt_show_customer_selected_name = null;
 
 
@@ -564,17 +569,20 @@ app.post('/api/message', function (req, res) {
 						}
 						outputText += "</table><br/>";
 
-
-
-
 					}
 
 					outputText = addFeedbackButton(outputText);
-					outputText += data.output.text[0]; // what else i can do for you message.
-					
-					
+					if (data.output.text[0] != null)
+						outputText += data.output.text[0]; // what else i can do for you message.
+					else
+						outputText += data.output.text[1]; // what else i can do for you message.
+
+					data.context.node_output = null;
 
 				}
+
+
+
 
 
 
@@ -764,7 +772,7 @@ function recordResponseTime(response) {
 	var conversationId = null;
 	var fullName = null;
 	if (response != null) {
-		console.log(response);
+		//console.log(response);
 		if (response.intents[0] != null) {
 			intent = response.intents[0].intent;
 			lastUsedIntent = intent;
