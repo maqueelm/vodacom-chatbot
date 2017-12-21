@@ -1,9 +1,9 @@
 module.exports = function () {
-    var workspaceId = "8124c390-c801-4bcf-8439-f6875d09ab23";
+    var workspaceId = process.env.WORKSPACE_ID;
     var Conversation = require("watson-developer-cloud/conversation/v1");
     var conversation = new Conversation({
-        username: "8ed4fefa-9d78-4374-92ca-e75319d53244",
-        password: "ejsumaR2Noi6",
+        username: process.env.CONVERSATION_USERNAME,
+        password: process.env.CONVERSATION_PASSWORD,
         version_date: '2017-05-26'
     });
     var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
@@ -16,10 +16,25 @@ module.exports = function () {
     require('./stringhandler')();
     var S = require('string');
     var striptags = require('striptags');
+
     this.handleSitesIntent = function (data, inputText, outputText, sync) {
-        console.log("handleSitesIntent");
-        if (data.context.cxt_ci_flow_site_name != null && data.intents[0].intent != "incident") {
-            console.log("sites intent context variable checks");
+        var isValidSitesIntent = true;
+        if (data != null && data.entities != null) {
+            for (i = 0; i < data.entities.length; i++) {
+
+                if (data.intents[i] != null && data.intents[i].intent == 'incident') {
+                    isValidSitesIntent = false;
+                }
+            }
+        }
+        if (data.context.cxt_ci_flow_site_name == null) {
+            isValidSitesIntent = false;
+        }
+
+        console.log("isValidSitesIntent=>" + isValidSitesIntent);
+        if (data.context.cxt_ci_flow_site_name != null && isValidSitesIntent) {
+            console.log("handleSitesIntent");
+            console.log("data.context.cxt_ci_flow_site_name=>" + data.context.cxt_ci_flow_site_name);
             var lookForSiteNames = "Select ci_name from locations_lookup where LOWER(ci_name) = '" + data.context.cxt_ci_flow_site_name.toLowerCase() + "'";
             var lookForSiteNamesData = executeQuerySync(lookForSiteNames);
 
@@ -103,14 +118,14 @@ module.exports = function () {
     }
 
     this.handleCustomerIntent = function (data, inputText, outputText, incidentFlow, sync) {
-        // console.log("data.context.cxt_corporate_site_input=>"+data.context.cxt_corporate_site_input);
-        // console.log("data.intents[0].intent =>"+data.intents[0].intent);
+
         var isValidCustomerIntent = false;
         if (data != null && data.entities != null) {
             for (i = 0; i < data.entities.length; i++) {
 
                 if (data.entities[i] != null && data.entities[i].entity == 'corporate-customers') {
                     isValidCustomerIntent = true;
+
                 }
             }
 
@@ -118,21 +133,23 @@ module.exports = function () {
                 isValidCustomerIntent = true;
             }
         }
-
-        //console.log("isValidCustomerIntent=>" + isValidCustomerIntent);
-        //console.log("data.context.cxt_user_selected_customer=>" + data.context.cxt_user_selected_customer);
+        console.log("isValidCustomerIntent=>" + isValidCustomerIntent);
         if (data != null && data.context.cxt_user_selected_customer == null && isValidCustomerIntent) {
 
             var customerCount = 0;
             var customerList = [];
             var regionName = null;
+            var complexCustomerCase = false;
+            console.log("data.context.cxt_customer_input_text=>" + data.context.cxt_customer_input_text);
             var customerInputText = data.context.cxt_customer_input_text;
-           // console.log("customerInputText=>" + JSON.stringify(customerInputText));
             if (data.entities.length > 0) {
 
                 for (i = 0; i < data.entities.length; i++) {
 
                     if (data.entities[i] != null && data.entities[i].entity == 'corporate-customers') {
+                        if (data.entities[i].value == 'complexCustomer'){
+                            complexCustomerCase = true; 
+                        }
                         customerList[i] = data.entities[i].value;
                         customerCount++;
                     }
@@ -148,87 +165,125 @@ module.exports = function () {
             }
 
 
-            
+
             var inOperatorCustomer = '';
             if (customerCount >= 1) {
                 console.log("handleCustomerIntent");
+
+
+
+                if (customerList.length == 1) {
+                    customerInputText = customerList[0];
+                }
                 for (i = 0; i < customerList.length; i++) {
                     inOperatorCustomer += "'" + customerList[i] + "'";
                     if (i < customerList.length - 1) {
                         inOperatorCustomer += ",";
                     }
                 }
-                var sql = "Select DISTINCT MPLSVPN_NAME,IFACE_VLANID from  tellabs_ods.ebu_vlan_status_mv"
-                if (customerInputText == null) {
-                    sql += " where MPLSVPN_NAME like  (" + inOperatorCustomer + ")  AND IFACE_VLANID > 0 ";
+                var sql = "Select DISTINCT MPLSVPN_NAME,IFACE_VLANID from  tellabs_ods.ebu_vlan_status_mv";
+
+                if (complexCustomerCase) {
+                   
+                    sql += " where LOWER(MPLSVPN_NAME) = '" + customerName + "' AND IFACE_VLANID > 0";
+                    
                 } else {
-                    data.context.cxt_customer_input_text = customerInputText;
-                    customerInputText = S(customerInputText).replaceAll(' ', '%').s; // replacing space with % for like query
-                    sql += " where LOWER(MPLSVPN_NAME) like '%" + customerInputText.toLowerCase() + "%' AND IFACE_VLANID > 0";
+
+                    if (customerInputText == null) {
+                        sql += " where MPLSVPN_NAME in  (" + inOperatorCustomer + ")  AND IFACE_VLANID > 0 ";
+                        data.context.cxt_customer_region_list_query = "Select DISTINCT REGION from  tellabs_ods.ebu_vlan_status_mv  where MPLSVPN_NAME in  (" + inOperatorCustomer + ") AND IFACE_VLANID > 0";
+                    } else {
+                        data.context.cxt_customer_input_text = customerInputText;
+                        customerInputText = S(customerInputText).replaceAll(' ', '%').s; // replacing space with % for like query
+                        sql += " where LOWER(MPLSVPN_NAME) like '%" + customerInputText.toLowerCase() + "%' AND IFACE_VLANID > 0";
+                        data.context.cxt_customer_region_list_query = "Select DISTINCT REGION from  tellabs_ods.ebu_vlan_status_mv  where LOWER(MPLSVPN_NAME) like '%" + customerInputText.toLowerCase() + "%' AND IFACE_VLANID > 0";
+                    }
                 }
-                var output = null;
-                if (regionName != null) {
-
-
+                // if no complex customer given then we match customer if its in asked question.
+                if (regionName != null && data.context.cxt_complex_customer == null) {
                     sql += " AND LOWER(REGION) = '" + regionName.toLowerCase() + "'";
                 }
-                //console.log("customer sql =>" + sql);
+
+                console.log("customer sql =>" + sql);
+                var output = null;
                 var connection = getOracleDBConnection(sync);
                 output = getOracleQueryResult(connection, sql, sync);
                 doRelease(connection);
                 if (output != null && output.rows != null) {
-
                     customerCount = output.rows.length;
                 }
+
                 data.context.cxt_customer_query = sql;
-                /*if (customerCount == 1) {
-                    data.context.cxt_user_selected_customer = data.context.cxt_matched_customer_list[0];
-                }*/
+
+                if (customerCount == 1) {
+                    data.context.cxt_user_selected_customer = output.rows[0].MPLSVPN_NAME;
+
+                }
+                data.context.cxt_matched_customer_count = customerCount;
                 outputText = orchestrateBotResponseTextForCustomer(customerCount, data, regionName);
             } else {
-               // outputText = "No customer found with the given name.";
+                // outputText = "No customer found with the given name.";
             }
-       
+
         }
 
-       // console.log("data.entities.length=>"+JSON.stringify(data.entities.length));
+        // console.log("data.entities.length=>"+JSON.stringify(data.entities.length));
 
-        if (data!=null && data.context.cxt_customer_input_text != null && data.entities.length == 0) {
+        if (data != null && data.intents[0].intent == 'corporate-customer' && data.intents[0].confidence < 0.5 && customerCount == 0) {
+            // this code is written to handle the shit of Watson API that will not hit any intent in developer interface but when returned
+            // in orchestration layer it shows corporate customer intent for unknown input with confidence less than 0.5 not sure why just applying a check to 
+            // handle the scenario
+            data.context.cxt_customer_input_text = data.input.text;
+            data.context.cxt_unknown_customer_case = true;
+
+        }
+
+        if (data != null && data.context.cxt_customer_input_text != null && data.context.cxt_unknown_customer_case) {
 
             var sql = "Select DISTINCT MPLSVPN_NAME,IFACE_VLANID from  tellabs_ods.ebu_vlan_status_v";
-            
-            customerInputText = S(data.context.cxt_customer_input_text).replaceAll(' ', '%').s; // replacing space with % for like query
-            
-            sql += " where LOWER(MPLSVPN_NAME) like '%" + customerInputText.toLowerCase() + "%' AND IFACE_VLANID > 0"; 
-            
+
+            if (data.context.cxt_customer_input_text != null) {
+                customerInputText = data.context.cxt_customer_input_text;
+            }
+            if (data.context.cxt_unknown_input != null) {
+                customerInputText = data.context.cxt_unknown_input;
+            }
+
+            customerInputText = S(customerInputText).replaceAll(' ', '%').s; // replacing space with % for like query
+
+            sql += " where LOWER(MPLSVPN_NAME) like '%" + customerInputText.toLowerCase() + "%' AND IFACE_VLANID > 0";
+
             console.log("unknown customer sql =>" + sql);
-            
+
             var connection = getOracleDBConnection(sync);
-            
+
             output = getOracleQueryResult(connection, sql, sync);
-            
+
             doRelease(connection);
-            
+
             if (output != null && output.rows != null) {
-            
+
                 // add learning code here.
-                if(customerInputText != null) {
+                if (customerInputText != null) {
                     // Adding to watson training.
                     customerInputText = S(customerInputText).replaceAll('%', ' ').s; // replacing % with space for like query
-                    console.log("Adding entity=>"+customerInputText);
-                    createEntityValue(customerInputText,"corporate-customers");
+                    console.log("Adding entity=>" + customerInputText);
+                    createEntityValue(customerInputText, "corporate-customers");
                 }
                 customerCount = output.rows.length;
             }
             data.context.cxt_customer_query = sql;
-           /* if (customerCount == 1) {
+            if (customerCount == 1) {
+                // data.context.cxt_user_selected_customer = S(output.rows[0].MPLSVPN_NAME).replaceAll('/', '#').s;
                 data.context.cxt_user_selected_customer = output.rows[0].MPLSVPN_NAME;
-            }*/
+
+            }
+            data.context.cxt_matched_customer_count = customerCount;
             outputText = orchestrateBotResponseTextForCustomer(customerCount, data, regionName);
             data.context.cxt_customer_input_text = null;
         }
         // handling regiona and customer name case
-  
+
 
 
         return outputText;
@@ -236,7 +291,6 @@ module.exports = function () {
     }
 
     this.handleRegionIntent = function (data, inputText, outputText, sync) {
-        // console.log("checking region entities =>" + JSON.stringify(data.entities));
         var isValidRegionIntentCase = true;
         var regionName = null;
         if (data != null && data.entities != null) {
@@ -244,6 +298,10 @@ module.exports = function () {
             if (!data.context.cxt_region_show_isolated_fault && data.context.cxt_location_name_region_flow == null) {
                 isValidRegionIntentCase = true;
             } else {
+                isValidRegionIntentCase = false;
+            }
+
+            if (data.entities.length == 0) {
                 isValidRegionIntentCase = false;
             }
 
@@ -297,127 +355,114 @@ module.exports = function () {
 
     this.handleIncidentIntent = function (data, inputText, outputText, incidentFlow, sync) {
 
-        var goToIncidentIntent = false;
+        var isValidIncidentIntent = false;
+        var incidentNumber = false;
+        if (data != null && data.entities != null) {
 
+            for (i = 0; i < data.entities.length; i++) {
 
-        if (data.context.cxt_location_name_trx_flow == null && data.context.cxt_tx_name == null && data.context.cxt_region_name == null && data.context.cxt_customer_query == null && data.context.cxt_ci_flow_site_name == null && data.context.cxt_customer_flow_vlan_id == null) {
-            goToIncidentIntent = true;
-            if (data.entities[0] != null && data.entities[0].entity == '2g-sites') {
-                goToIncidentIntent = false;
+                if (data.entities[i] != null && (data.entities[i].entity == 'corporate-customers' || data.entities[i].entity == '2g-sites')) {
+                    isValidIncidentIntent = false;
+                }
+                if (data.intents[i] != null && (data.intents[i].intent == "sites" || data.intents[i].intent == "regions")) {
+                    isValidIncidentIntent = false;
+                }
+                if (data.entities[i] != null && data.entities[i].entity == "incidents") {
+                    isValidIncidentIntent = true;
+                }
+                if (data.intents[i] != null && data.intents[i].intent == "incident" && data.intents[i].confidence > 0.5) {
+                    isValidIncidentIntent = true;
+                }
+                if (data.entities[i].entity == 'sys-number') {
+                    console.log("incident number matched by entity");
+                    incidentNumber = data.entities[i].value;
+                }
+
+            }
+            if (inputText != null) {
+                regexTest = inputText.match(/[incINC]*([0-9])+/i);
+                if (regexTest != null) {
+                    console.log("incident number matched by regular expression");
+                    incidentNumber = regexTest[0];
+                }
+            }
+            console.log("incidentNumber=>" + JSON.stringify(incidentNumber));
+            if (incidentNumber && data.context.cxt_location_name_trx_flow == null && data.context.cxt_tx_name == null && data.context.cxt_region_name == null && data.context.cxt_matched_customer_count == 0 && data.context.cxt_ci_flow_site_name == null) {
+                isValidIncidentIntent = true;
+            } else {
+                isValidIncidentIntent = false;
             }
 
 
         }
 
 
-        console.log("goToIncidentIntent=>" + goToIncidentIntent);
+        console.log("isValidIncidentIntent=>" + isValidIncidentIntent);
 
-        if ((data != null && data.intents[0] != null && data.intents[0].intent == "incident" && data.intents[0].confidence > 0.5 && data.intents[0].intent != "sites" && data.intents[0].intent != "regions" && goToIncidentIntent) || (data != null && data.entities[0] != null && data.intents[0].intent != "sites" && data.intents[0].intent != "regions" && data.entities[0].entity == "incidents" && goToIncidentIntent)) {
+
+        if (isValidIncidentIntent) {
 
             console.log("handleIncidentIntent");
+            console.log("incidentNumber=>" + JSON.stringify(incidentNumber));
             incidentFlow = true;
-            //console.log(JSON.stringify(data));
-            if (inputText != null) {
+            if (incidentNumber) {
+                var incident_no_str = incidentNumber.toUpperCase();
+                incidentNumber = correctIncidentNumberFormat(incident_no_str);
 
-
-
-
-                regexTest = inputText.match(/[incINC]*([0-9])+/i);
-
-                var incidentNumber = false;
-                if (regexTest != null) {
-                    console.log("incident number matched by regular expression");
-                    incidentNumber = regexTest[0];
-                } else {
-                    console.log("incident number matched by entity");
-                    for (i = 0; i < data.entities.length; i++) {
-
-                        if (data.entities[i].entity == 'sys-number') {
-                            incidentNumber = data.entities[i].value;
-                        }
-                    }
-
-                }
-
-                console.log(JSON.stringify(incidentNumber));
-                if (incidentNumber) {
-                    var incident_no_str = incidentNumber.toUpperCase();
-                    incidentNumber = correctIncidentNumberFormat(incident_no_str);
-                    // incidentNumber = S(incidentNumber).replaceAll('inc', '').s;
-
-                    var sql = "Select " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and inc.INCIDENT_NUMBER  = '" + incidentNumber + "'";
-                    console.log(sql);
-                    //var output = executeQuerySync(sql);
-                    var connection = getOracleDBConnectionRemedy(sync);
-                    var output = getOracleQueryResult(connection, sql, sync);
-                    doRelease(connection);
-
-                    var childsql = "Select count(*) as CHILD_COUNT from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3)  and inc.ORIGINAL_INCIDENT_NUMBER  = '" + incidentNumber + "'";
-                    //var childoutput = executeQuerySync(childsql);
+                var sql = "Select " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and inc.INCIDENT_NUMBER  = '" + incidentNumber + "'";
+                var connection = getOracleDBConnectionRemedy(sync);
+                var output = getOracleQueryResult(connection, sql, sync);
+                doRelease(connection);
+                if (output != null && output.rows != null && output.rows.length > 0) {
+                    console.log("found incident");
+                    var childsql = "Select count(*) as CHILD_COUNT from " + incidentTableName + " where inc.STATUS in (0,1,2,3)  and inc.ORIGINAL_INCIDENT_NUMBER  = '" + incidentNumber + "'";
+                    console.log("child incident count query =>" + childsql);
                     var connection = getOracleDBConnectionRemedy(sync);
                     var childoutput = getOracleQueryResult(connection, childsql, sync);
                     doRelease(connection);
                     var childCount = 0;
-
                     if (childoutput != null && childoutput.rows != null) {
                         console.log("child count for incident =>" + childoutput.rows[0].CHILD_COUNT);
                         childCount = childoutput.rows[0].CHILD_COUNT;
                     }
-                    //console.log("checking output condition");
-                    if (output != null) {
-                        //console.log("out put is not null");
-                        if (output.rows != null && output.rows.length > 0) {
-                            console.log("found incident");
-                            outputText = orchestrateBotResponseTextForIncident(output.rows, data.output.text, data, childCount);
-                        }
-                        if (output.rows.length == 0) {
-                            //console.log("in not found message.");
-                            outputText = "<b>Sorry, no result can be found against given incident number " + incidentNumber + ". Please provide with a different incident number.</b>";
-                        } else {
-                            console.log("incident" + incidentNumber + " found");
-                        }
-
-                    } else {
-                        //console.log("out put is null");
-                        outputText = "<b>Sorry, no result can be found against given incident number " + incidentNumber + " in remedy. Please provide with a different incident number.</b>";
-                    }
+                    outputText = orchestrateBotResponseTextForIncident(output.rows, data.output.text, data, childCount);
                 } else {
-                    //console.log("last else =>");
-                    outputText = "Yes sure, please provide me with the incident number.";
+                    outputText = "<b>Sorry, no result can be found against given incident number " + incidentNumber + " in remedy. Please provide with a different incident number.</b>";
                 }
-                // handling the case for problems,change requests and tasks.
-                //console.log("testing problem change and task =>");
-                regexTest = inputText.match(/PBI[0-9]+/i);
-                if (regexTest != null) {
-                    outputText = "<b>I am only trained to search Incidents, I cannot search problem refs.</b>";
-                }
-                regexTest = inputText.match(/CRQ[0-9]+/i);
-                if (regexTest != null) {
-                    outputText = "<b>I am only trained to search Incidents, I cannot search change refs.</b>";
-                }
-                regexTest = inputText.match(/CR[0-9]+/i);
-                if (regexTest != null) {
-                    outputText = "<b>I am only trained to search Incidents, I cannot search change refs.</b>";
+            } else {
 
-                }
-                regexTest = inputText.match(/TAS[0-9]+/i);
-                if (regexTest != null) {
-                    outputText = "<b>I am only trained to search Incidents, I cannot search Task refs.</b>";
-                }
-                regexTest = inputText.match(/[nodeNODE]+([0-9])+/i);
-                if (regexTest != null) {
-                    outputText = "<b>This seems to be a Node name, i am not trained to look for node names. If you are asking about a site , please provide site name.</b>";
-                }
+                outputText = "Yes sure, please provide me with the incident number.";
+            }
+            // handling the case for problems,change requests and tasks.
+            //console.log("testing problem change and task =>");
+            regexTest = inputText.match(/PBI[0-9]+/i);
+            if (regexTest != null) {
+                outputText = "<b>I am only trained to search Incidents, I cannot search problem refs.</b>";
+            }
+            regexTest = inputText.match(/CRQ[0-9]+/i);
+            if (regexTest != null) {
+                outputText = "<b>I am only trained to search Incidents, I cannot search change refs.</b>";
+            }
+            regexTest = inputText.match(/CR[0-9]+/i);
+            if (regexTest != null) {
+                outputText = "<b>I am only trained to search Incidents, I cannot search change refs.</b>";
 
-                regexTest = inputText.match(/[trunkTRUNK]+([0-9])+/i);
-                if (regexTest != null) {
-                    outputText = "<b>This seems to be a Trunk name, i am not trained to look for trunk names. If you are asking about a site , please provide site name.</b>";
-                }
+            }
+            regexTest = inputText.match(/TAS[0-9]+/i);
+            if (regexTest != null) {
+                outputText = "<b>I am only trained to search Incidents, I cannot search Task refs.</b>";
+            }
+            regexTest = inputText.match(/[nodeNODE]+([0-9])+/i);
+            if (regexTest != null) {
+                outputText = "<b>This seems to be a Node name, i am not trained to look for node names. If you are asking about a site , please provide site name.</b>";
+            }
 
+            regexTest = inputText.match(/[trunkTRUNK]+([0-9])+/i);
+            if (regexTest != null) {
+                outputText = "<b>This seems to be a Trunk name, i am not trained to look for trunk names. If you are asking about a site , please provide site name.</b>";
             }
 
         }
-
         return outputText;
     }
 
@@ -472,51 +517,46 @@ module.exports = function () {
 
     }
 
-   
-
-    
-
-    
-    function createEntityValue(val,entityName) {
+    function createEntityValue(val, entityName) {
         var params = {
             workspace_id: workspaceId,
             entity: entityName,
             value: val
-          };
-    
-        conversation.createValue(params, function(err, response) {
+        };
+
+        conversation.createValue(params, function (err, response) {
             if (err) {
-              console.error(err);
+                console.error(err);
             } else {
-              console.log(JSON.stringify(response, null, 2));
-              var res = val.split(" ");
-              for(i=0; i<res.length; i++) {
-                createSynonymsForValue(val,entityName,res[i]);
-              }
+                console.log(JSON.stringify(response, null, 2));
+                var res = val.split(" ");
+                for (i = 0; i < res.length; i++) {
+                    createSynonymsForValue(val, entityName, res[i]);
+                }
             }
-          
-          });
-    
-    
+
+        });
+
+
     }
-    
-    function createSynonymsForValue(val,entityName,synonymVal) { 
-      var params = {
-        workspace_id: workspaceId,
-        entity: entityName,
-        value: val,
-        synonym: synonymVal
-      };
-     conversation.createSynonym(params, function(err, response) {   
-        if (err) {
-          console.error(err);
-        } else {
-          console.log(JSON.stringify(response, null, 2));
-        }
-      
-      });
-    }   
-    
+
+    function createSynonymsForValue(val, entityName, synonymVal) {
+        var params = {
+            workspace_id: workspaceId,
+            entity: entityName,
+            value: val,
+            synonym: synonymVal
+        };
+        conversation.createSynonym(params, function (err, response) {
+            if (err) {
+                console.error(err);
+            } else {
+                console.log(JSON.stringify(response, null, 2));
+            }
+
+        });
+    }
+
 
 
 };

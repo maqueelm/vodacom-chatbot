@@ -74,9 +74,9 @@ module.exports = function () {
 		outputText_new = S(outputText_new).replaceAll('[incident_summary]', dbQueryResult[0].SUMMARY).s;
 		outputText_new = S(outputText_new).replaceAll('[task_assignee_group]', dbQueryResult[0].TASK_ASSIGNEE_GROUP).s;
 		outputText_new = S(outputText_new).replaceAll('[task_assignee]', dbQueryResult[0].TASK_ASSIGNEE).s;
-
+		outputText_new += "<br/><b>Incident Event Start:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_START_TIME + "</i>"; 
 		if (dbQueryResult[0].INC_STATUS.toLowerCase() == 'closed') {
-			outputText_new += "<br/><b>Incident Event Start:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_START_TIME + "</i> <br/> <b>Incident Event Closed:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_END_TIME + "</i>.";
+			outputText_new += "<b>Incident Event Closed:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_END_TIME + "</i>.";
 			outputText_new += "<br/><b>Cause: </b>" + dbQueryResult[0].cause_tier_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].RESOLUTION_CATEGORY_TIER_3 + "";
 		}
 
@@ -153,11 +153,11 @@ module.exports = function () {
 
 				outputText += "<br/> I also found that  <b>" + dbQueryResult[0].INCIDENT_NUMBER + "</b> is a <b>" + dbQueryResult[0].RELATIONSHIP_TYPE + "</b> incident ";
 				if (childCount > 0) {
-					outputText += "and it has <b>" + child_incident_count + "</b> child incidents, if you like to see these incidents detail, reply with <b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >yes</a></b>.";
+					outputText += "and it has <b>" + child_incident_count + "</b> open child incidents, if you like to see these incidents detail, reply with <b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >yes</a></b>.";
 
 				} else {
 					response.context.cxt_incident_number = -1;
-					outputText += "and it does not have any child incidents.<br/><br/> <b>Is there anything i can help you with? I have information about incident, region, customer, transmission failure and shift reports. Please choose one.</b>";
+					outputText += "and it does not have any open child incidents.<br/><br/> <b>Is there anything i can help you with? I have information about incident, region, customer, transmission failure and shift reports. Please choose one.</b>";
 
 				}
 			} else {
@@ -467,7 +467,15 @@ module.exports = function () {
 		outputText = S(outputText).replaceAll('[region_name]', "<b>" + regionName + "</b>").s;
 		
 		} else {
-			outputText = "<br/><b>Sorry no result found for specified customer in "+regionName+".<br/> Reply with yes to search again.</b>";
+			if (regionName != null)
+				outputText = "<br/><b>Sorry no result found for specified customer in "+regionName+".<br/><br/> Reply with <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a> to search again.</b>";
+			else 
+				outputText = "<br/><b>Sorry no result found for specified customer <br/><br/> Reply with <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a> to search again.</b>";
+
+				data.context.cxt_customer_flow_found = false;
+				data.context.cxt_unknown_input = null;
+				data.context.cxt_matched_customer_list = null;
+				data.context.cxt_customer_input_text = null;
 		}
 
 		return outputText;
@@ -483,7 +491,13 @@ module.exports = function () {
 		//if (dbQueryResult != null) {
 
 		var cause_tier_1 = data.context.cxt_tx_name;
-		var childIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as CHILDCOUNT from " + incidentTableName + " where (inc.INCIDENT_ASSOCIATION_TYPE = 1 and  inc.STATUS in (0,1,2,3)) and LOWER(inc.GENERIC_CATEGORIZATION_TIER_2) = '" + cause_tier_1.toLowerCase() + "'";
+		var childIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as CHILDCOUNT from " + incidentTableName + " where (inc.INCIDENT_ASSOCIATION_TYPE = 1 and  inc.STATUS in (0,1,2,3)) ";
+		if (cause_tier_1.toLowerCase() == 'transmission') {
+			childIncidentCountsql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx')";
+		} else {
+			childIncidentCountsql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) = '" + cause_tier_1.toLowerCase() + "'";
+		}
+		
 		console.log("childIncidentCountsql =>" + childIncidentCountsql);
 		var connection = getOracleDBConnectionRemedy(sync);
 		var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql, sync);
@@ -492,7 +506,14 @@ module.exports = function () {
 		childIncidentCount = childIncidentCountResult.rows[0].CHILDCOUNT;
 		data.context.cxt_child_incident_count_for_region = childIncidentCount;
 		// association type 1 = child , 0 = master, null = standalone
-		var masterIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as MASTERCOUNT from " + incidentTableName + " inner join " + incidentTableName_2 + "  on (inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3)) and LOWER(inc.GENERIC_CATEGORIZATION_TIER_2) = '" + cause_tier_1.toLowerCase() + "' ";
+		//LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx');
+		var masterIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as MASTERCOUNT from " + incidentTableName + " inner join " + incidentTableName_2 + "  on (inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3))";
+		if (cause_tier_1.toLowerCase() == 'transmission') {
+			masterIncidentCountsql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx') ";	
+		} else {
+			masterIncidentCountsql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) = '" + cause_tier_1.toLowerCase() + "' ";
+		}
+		
 		//var masterIncidentCountsql = "Select count(distinct inc.ORIGINAL_INCIDENT_NUMBER) as MASTERCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER and inc_2.INCIDENT_ASSOCIATION_TYPE  = 0) where LOWER(inc.region) = '" + regionName_2.toLowerCase() + "' and inc_2.STATUS not in (5,6) ";//and inc_2.STATUS not in (5,6)
 		//var childIncidentCountsql = "Select count(*) as CHILDCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where LOWER(inc.region) like '%" + regionName_2.toLowerCase() + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
