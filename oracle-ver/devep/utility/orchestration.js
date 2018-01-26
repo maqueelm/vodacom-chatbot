@@ -136,10 +136,13 @@ module.exports = function () {
 			outputText = S(outputText).replaceAll('[status]', dbQueryResult[0].INC_STATUS).s;
 			outputText = S(outputText).replaceAll('[assigned_to]', dbQueryResult[0].ASSIGNED_GROUP).s;
 			outputText = S(outputText).replaceAll('[incident_summary]', dbQueryResult[0].SUMMARY).s;
+			outputText = S(outputText).replaceAll('[incident_event_start_time]', dbQueryResult[0].INCIDENT_EVENT_START_TIME).s;
 			outputText = S(outputText).replaceAll('[task_assignee_group]', dbQueryResult[0].TASK_ASSIGNEE_GROUP).s;
 			outputText = S(outputText).replaceAll('[task_assignee]', dbQueryResult[0].TASK_ASSIGNEE).s;
+			outputText = S(outputText).replaceAll('[DETAILED_DESCRIPTION]', dbQueryResult[0].DETAILED_DESCRIPTION).s;
+			outputText = S(outputText).replaceAll('[WORK_LOG_DATE]', dbQueryResult[0].WORK_LOG_DATE).s;
 			console.log("Output after replace =>" + outputText);
-			outputText += "<br/><i><b>Incident Event Start:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_START_TIME;
+			//outputText += "<br/><i><b>Incident Event Start:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_START_TIME;
 			if (dbQueryResult[0].INC_STATUS.toLowerCase() == 'closed') {
 
 				outputText += "<br/><b>Incident Event Closed:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_END_TIME + "</i>.";
@@ -181,7 +184,9 @@ module.exports = function () {
 		var childIncidentCount = 0;
 		//if (dbQueryResult != null) {
 
-		var childIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as CHILDCOUNT from " + incidentTableName + " where (inc.INCIDENT_ASSOCIATION_TYPE = 1 and  inc.STATUS in (0,1,2,3)) and LOWER(inc.region) = '" + regionName_2.toLowerCase() + "'";
+		var childIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as CHILDCOUNT from " + incidentTableName + " where (inc.INCIDENT_ASSOCIATION_TYPE = 1 and  inc.STATUS in (0,1,2,3))";
+		childIncidentCountsql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
+		childIncidentCountsql += " and LOWER(inc.region) = '" + regionName_2.toLowerCase() + "' ";
 		console.log("childIncidentCountsql =>" + childIncidentCountsql);
 		var connection = getOracleDBConnectionRemedy(sync);
 		var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql, sync);
@@ -190,7 +195,9 @@ module.exports = function () {
 		childIncidentCount = childIncidentCountResult.rows[0].CHILDCOUNT;
 		data.context.cxt_child_incident_count_for_region = childIncidentCount;
 		// association type 1 = child , 0 = master, null = standalone
-		var masterIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as MASTERCOUNT from " + incidentTableName + " inner join " + incidentTableName_2 + "  on (inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3)) and LOWER(inc.region) = '" + regionName_2.toLowerCase() + "' ";
+		var masterIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as MASTERCOUNT from " + incidentTableName + " inner join " + incidentTableName_2 + "  on (inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3))";
+		masterIncidentCountsql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
+		masterIncidentCountsql += " and LOWER(inc.region) = '" + regionName_2.toLowerCase() + "' ";
 		//var masterIncidentCountsql = "Select count(distinct inc.ORIGINAL_INCIDENT_NUMBER) as MASTERCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER and inc_2.INCIDENT_ASSOCIATION_TYPE  = 0) where LOWER(inc.region) = '" + regionName_2.toLowerCase() + "' and inc_2.STATUS not in (5,6) ";//and inc_2.STATUS not in (5,6)
 		//var childIncidentCountsql = "Select count(*) as CHILDCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where LOWER(inc.region) like '%" + regionName_2.toLowerCase() + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
 		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
@@ -234,32 +241,33 @@ module.exports = function () {
 
 	}
 
-	this.updateSuggestedLocationsInMessage = function (messageText, regionCode, sync) {
-		// using materialized view name_repo.NMG_CHATBOT_MV
-		var locationQuery = "SELECT DISTINCT REPO_LOCATION_NAME AS LOCATION_NAME from name_repo.NMG_CHATBOT_MV WHERE LOWER(region) = '" + regionCode.toLowerCase() + "' AND ROWNUM < 20";
-		/*var locationQuery = "SELECT distinct l.name as location_name,l.object_key as location_key, l.atoll_id, l.remedy_name as remedy_location_name, n.OBJECT_CLASS, n.OBJECT_KEY, n.NAME as CI_NAME, n.NODE_STATUS, n.PARENT_NODE, n.REMEDY_STATUS, n.REMEDY_ID"+
-							 " FROM name_repo.node_v n JOIN name_repo.site_v l ON n.site = l.object_key WHERE ROWNUM < 11 and n.NODE_STATUS = 'In Service' and l.remedy_name like '%" + regionCode + "%' ";*/
-		console.log("Query for updating locations in message. =>" + locationQuery);
-		//var locationsResultSet = executeQuerySync(locationQuery);
-		var connection = getOracleDBConnection(sync);
-		var locationsResultSet = getOracleQueryResult(connection, locationQuery, sync);
-		doRelease(connection);
+	this.updateSuggestedLocationsInMessage = function (messageText, locationListQuery, sync) {
+		
+		var locationsText = '';
 		if (messageText == null) {
-			messageText = '';
+			messageText = '[trx_locations_here]';
 		}
-		if (locationsResultSet != null && locationsResultSet.rows.length > 0) {
-			messageText = "<b>Select the location name. Common Locations are</b> <br/>";
-			for (i = 0; i < locationsResultSet.rows.length; i++) {
-				messageText += "<a href='#' id='location_'"+i+" onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>"+locationsResultSet.rows[i].LOCATION_NAME+"</a>";
-				if (i < locationsResultSet.rows.length - 1)
-					messageText += ",&nbsp;";
-				if (i > 0 && i % 8 == 0) {
-					messageText += "<br/>";
+		var connection = getOracleDBConnection(sync);
+		var locationList = getOracleQueryResult(connection, locationListQuery, sync);
+		if (locationList != null && locationList.rows.length > 0) {
+			locationsText = "<b>Select the location name. Common Locations are</b> <br/><table>";
+			locationsText += "<tr><td><ul>";
+			for (i = 0; i < locationList.rows.length; i++) {
+				locationsText += "<li>";
+				locationsText += "<a href='#' id='location_" + i + "' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + locationList.rows[i].LOCATION_NAME + "</a>";
+				locationsText += "</li>";
+				if (i > 0 && i % 4 == 0) {
+					locationsText += "</ul><td><ul>";
 				}
 
 			}
+			locationsText += "</tr></table>";
 
 
+		}
+		messageText = S(messageText).replaceAll('[trx_locations_here]', locationsText).s;
+		if (locationsText == ''){
+			messageText = "<b>Select the location name. Common Locations are <a id='location_0' href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>Bellville</a>,<a id='location_1' href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>Century City</a></b> <br/>";	
 		}
 		return messageText;
 	}
@@ -268,7 +276,7 @@ module.exports = function () {
 		var outputText_new;
 		var excelFileName = "incidentListBasedOnSite_" + conversationId + "_" + new Date().getTime() + ".xlsx";
 		if (dbQueryResult.length == 0) {
-			outputText_new = "Sorry <b>no</b> incident found against the given site name.<br/>";
+			outputText_new = "<b>Sorry no incident found against the given site name<b>.<br/>";
 			//outputText += updateSuggestedLocationsInMessage(outputText_new, data.context.cxt_region_name);
 			if (data.output.text[0] != null) {
 				outputText = outputText_new + data.output.text[0];
@@ -350,7 +358,7 @@ module.exports = function () {
 		var outputText_new = "";
 
 		if (dbQueryResult.length == 0) {
-			outputText_new = "There are <b>no</b> master incidents that have child associations.<br/>";
+			outputText_new = "<b>There are <b>no</b> master incidents that have child associations</b>.<br/>";
 		} else {
 
 			if (dbQueryResult.length > 0 && dbQueryResult.length > excelGenerationRecordCountLimit) {
@@ -377,7 +385,7 @@ module.exports = function () {
 		}
 
 		if (data.output.text[0] != null) {
-			outputText = outputText_new + data.output.text[0];
+			outputText = outputText_new + "<b>"+data.output.text[0]+"</b>";
 		} else {
 			outputText = outputText_new;
 		}
@@ -436,7 +444,7 @@ module.exports = function () {
 			buildExcelSheet(excelFileName, dbQueryResult, 4);
 
 		} else if (dbQueryResult.length > 0) {
-			outputText_new += "There are total <b>" + dbQueryResult.length + "</b> master incidents for transmission failure type " + data.context.cxt_tx_name + ". ";
+			outputText_new += "There are total <b>" + dbQueryResult.length + "</b> master incidents for technology type " + data.context.cxt_tx_name + ". ";
 			outputText_new += "<table class='w-80'>";
 			outputText_new += "<tr><th>INCIDENT NUMBER</th><th>DESCRIPTION</th><th>STATUS</th><th>SITE NAME</th></tr>";
 			for (i = 0; i < dbQueryResult.length; i++) {
@@ -492,6 +500,7 @@ module.exports = function () {
 
 		var cause_tier_1 = data.context.cxt_tx_name;
 		var childIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as CHILDCOUNT from " + incidentTableName + " where (inc.INCIDENT_ASSOCIATION_TYPE = 1 and  inc.STATUS in (0,1,2,3)) ";
+		childIncidentCountsql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
 		if (cause_tier_1.toLowerCase() == 'transmission') {
 			childIncidentCountsql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx')";
 		} else {
@@ -508,6 +517,7 @@ module.exports = function () {
 		// association type 1 = child , 0 = master, null = standalone
 		//LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx');
 		var masterIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as MASTERCOUNT from " + incidentTableName + " inner join " + incidentTableName_2 + "  on (inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3))";
+		masterIncidentCountsql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
 		if (cause_tier_1.toLowerCase() == 'transmission') {
 			masterIncidentCountsql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx') ";	
 		} else {
@@ -540,7 +550,7 @@ module.exports = function () {
 		outputText = S(outputText).replaceAll('[child_incident_count]', "<b>" + childIncidentCount + "</b>").s;
 		outputText = S(outputText).replaceAll('[is_are]', is_are).s;
 		if (totalCount) {
-			outputText_new = "<br/>Do you want to further drill down the search? reply with <b>yes or no</b>.";
+			outputText_new = "<br/>Do you want to further drill down the search? reply with <b<b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >yes</a></b>&nbsp; <b><a href='#' id='no' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >no</a></b></b>.";
 		} else {
 			outputText_new = "<br/><b>No</b> incidents found against the given domain. If you want to search anything else reply with <b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >yes</a></b>.";
 		}

@@ -33,6 +33,16 @@
             myWindow = window.open('/feedback.html');
 
         }
+        function copyToTypingAreaCustomer(obj) {
+            var anchorId = obj.id;
+            var anchorText = $("#"+ anchorId).text();
+            $('#textInput').val("<span class='hidden'>"+anchorId+"@</span>"+anchorText);
+            var e = $.Event("keydown");
+            e.which = 13;
+            e.keyCode = 13;
+            $('#textInput').trigger(e);
+           
+        }
         function copyToTypingArea(obj) {
             var anchorId = obj.id;
             var anchorText = $("#"+ anchorId).text();
@@ -41,30 +51,30 @@
             e.which = 13;
             e.keyCode = 13;
             $('#textInput').trigger(e);
-            /*if (anchorId == 'startover') {
-                $('#textInput').val("resetting .....");
-                $('#textInput').trigger(e); 
-                $('#textInput').val("Chat is now reset.");
-                $('#textInput').trigger(e); 
-            }*/
+           
         }
 
     </script>
     <style>
+        .hidden{
+            display:none;
+        }
         table {
             width: 100% !important;
             margin-top: 2%;
+            font-size: 13px !important;
         }
-
         table td {
             padding: 5px;
             vertical-align: top;
+            font-size: 13px !important;
         }
 
         table th {
             color: #C3100F;
             background: #fff;
             padding: 5px;
+            font-size: 13px !important;
         }
 
         b {
@@ -177,6 +187,22 @@
             margin-left: 93.5%;
             position: fixed;
             display: block;
+        }
+        a#master{
+            background-color: ForestGreen;
+            border-radius: 5px;
+            color: white;
+            padding: .5em;
+            text-decoration: none; 
+            line-height: 5em; 
+        }
+        a#fault {
+            background-color: red;
+            border-radius: 5px;
+            color: white;
+            padding: .5em;
+            text-decoration: none;
+            line-height: 5em;  
         }
     </style>
 </head>

@@ -88,9 +88,13 @@ module.exports = function () {
         data.context.cxt_user_selected_customer = null;
         data.context.cxt_customer_drill_down_region = null;
         data.context.node_output_query = null;
-      //  data.context.cxt_customer_input_text = null;
+        //  data.context.cxt_customer_input_text = null;
         data.context.cxt_customer_region_list_query = null;
         data.context.cxt_unknown_input = null;
+        data.context.cxt_complex_customer = null;
+        data.context.cxt_complex_customer_case = true;
+        data.context.cxt_user_selected_customer = null;
+        data.context.cxt_plain_customer_name_case = false;
         return data;
     }
     this.resetIncidentContext = function (data) {
@@ -98,7 +102,6 @@ module.exports = function () {
         data.context.cxt_parent_incident_number = -1;
         data.context.cxt_is_master_incident = false;
         data.context.cxt_child_incident_count = 0;
-        data.context.cxt_show_incident_details = true;
         data.context.cxt_parent_incident_number = -1;
         return data;
     }
@@ -109,17 +112,54 @@ module.exports = function () {
         data.context.cxt_region_show_isolated_fault = false;
         data.context.cxt_region_show_master_incident = false;
         data.context.cxt_site_name_region_flow_found = null;
-        data.context.cxt_region_show_master_incident = false;
+        data.context.cxt_site_name_region_flow = null;
+        data.context.cxt_region_flow_search_for_location = false;
+        data.context.cxt_location_name_region_flow_found = false;
+        data.context.cxt_location_name_region_flow = null;
         return data;
     }
     this.resetSitesContext = function (data) {
-
+        data.context.cxt_site_flow_found = false;
+        data.context.cxt_ci_flow_site_name = null;
+        data.context.cxt_ci_flow_show_incident = false;
+        data.context.cxt_ci_site_name_found_in_db = false;
         return data;
     }
     this.resetTransmissionFailureContext = function (data) {
         data.context.cxt_tx_name = null;
         data.context.cxt_tx_found_incident_count = -1;
+        data.context.cxt_location_list_trx_failure_query = null;
         return data;
+    }
+
+    this.resetEveryThing = function (data) {
+        data = resetCustomerContext(data);
+        data = resetIncidentContext(data);
+        data = resetRegionContext(data);
+        data = resetSitesContext(data);
+        data = resetTransmissionFailureContext(data);
+        return data;
+    }
+
+    this.getCorrectComplexCustomerNameFromPatternMatching = function (customerList) {
+        /**
+         * The pattern matching technique is using multiple regular expressions so in some cases watson matches multiple
+         * literals for one complex customer name. This method will pick the customer name that will be longest in length.
+         * The largest in length will be the correct match by pattern matcher.
+         */
+        var validCustomerName = null;
+        var customerNameLength = 0;
+        for (i = 0; i < customerList.length; i++) {
+
+            if (customerList[i].length > customerNameLength) {
+                customerNameLength = customerList[i].length;
+                validCustomerName = customerList[i];
+            }
+
+        }
+
+        return validCustomerName;
+
     }
 
 

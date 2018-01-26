@@ -23,7 +23,7 @@ var bodyParser = require('body-parser'); // parser for post requests
 var Conversation = require('watson-developer-cloud/conversation/v1'); // watson sdk
 var DiscoveryV1 = require('watson-developer-cloud/discovery/v1');
 var striptags = require('striptags');
-
+var Rating = require('rating');
 /* Variables Declaration */
 
 var app = express();
@@ -66,6 +66,7 @@ require('./utility/orchestration.js')();
 require('./db/db-oracle.js')();
 require('./db/db-mysql.js')();
 require('./utility/stringhandler.js')();
+require('./utility/contexthandler.js')();
 
 // Create the service wrapper
 var conversation = new Conversation({
@@ -95,9 +96,11 @@ app.post('/api/message', function (req, res) {
 		context: req.body.context || {},
 		input: req.body.input || {}
 	};
-
-	conversation.message(payload, function (err, data) {
+	// Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
+	// data contains response 
+	conversation.message(payload, function (err, response) {
 		try {
+
 			fiber(function () {
 				if (err) {
 					//return res.status(err.code || 500).json(err);
@@ -107,550 +110,70 @@ app.post('/api/message', function (req, res) {
 					inputText = req.body.input.text;
 					//console.log("Input provided is => "+req.body.input.text);
 				}
-				outputText = null;
+				//outputText = null;
 				conversationId = payload.context.conversation_id;
-				
+				console.log(JSON.stringify(response));
+				if (response != null) {
+					response = startOverConversationWithContext(response);
 
-				if (data != null && data.context.cxt_show_incident_details != null && data.context.cxt_show_incident_details == true && data.context.cxt_incident_number != null && data.context.cxt_incident_number != -1 && data.context.cxt_is_master_incident != null && data.context.cxt_is_master_incident) {
+					response = showChildIncidentsWithContext(response,sync,conversationId);
 
-					var childsql = "Select " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and inc.ORIGINAL_INCIDENT_NUMBER  = '" + correctIncidentNumberFormat(data.context.cxt_incident_number) + "'";
-					console.log("query from context variable =>" + childsql);
-					//var childoutput = executeQuerySync(childsql);
-					var connection = getOracleDBConnectionRemedy(sync);
-					var childoutput = getOracleQueryResult(connection, childsql, sync);
-					doRelease(connection);
-					outputText = showChildIncidents(childoutput.rows, outputText, data, conversationId);
-					data.context.cxt_show_incident_details = false;
-					data.context.cxt_show_anything_else_msg = true;
+					response = showParentIncidentDetailsWithContext(response,sync);
 
+					response = showMasterIncidentForRegionWithContext(response, sync, conversationId);
+
+					response = regionIntentIsolatedFaultFlowWithContext(response, sync,conversationId);
+
+					response = technologyTypeFlowWithContext(response, sync,conversationId);
+
+					response = corporateCustomerFlowWithContext(response, sync);
 				}
-				//console.log("i am here 2");
-				// show incident details intent 1 :: showing child of master
-				if (data != null && data.context.cxt_show_incident_details != null && data.context.cxt_show_incident_details == true && data.context.cxt_parent_incident_number != null && data.context.cxt_parent_incident_number != -1 && data.context.cxt_is_master_incident != null && !data.context.cxt_is_master_incident) {
-					var childsql = "Select " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and inc.INCIDENT_NUMBER  = '" + correctIncidentNumberFormat(data.context.cxt_parent_incident_number) + "'";
-					console.log("query from context variable =>" + childsql);
-					//var childoutput = executeQuerySync(childsql);
-					var connection = getOracleDBConnectionRemedy(sync);
-					var childoutput = getOracleQueryResult(connection, childsql, sync);
-					doRelease(connection);
-					outputText = showParentIncidentDetails(childoutput.rows, outputText, data);
-					data.context.cxt_show_anything_else_msg = true;
-					data.context.cxt_show_incident_details = false;
-					data.context.cxt_parent_incident_number = -1;
+				//console.log("response =>" + JSON.stringify(response));
 
-
-
-				}
-				//	console.log("i am here 3");
-				// intent 2 :: Master Incident
-
-				if (data != null && data.context.cxt_region_show_master_incident) {
-
-					console.log("data.context.cxt_region_name =>" + data.context.cxt_region_name);
-					var regionLookupQuery = "Select * from region_lookup where (LOWER(full_name) = '" + data.context.cxt_region_name.toLowerCase() + "' OR LOWER(abbreviation) = '" + data.context.cxt_region_name.toLowerCase() + "')";
-					console.log("region lookup query for customer intent. =>" + regionLookupQuery);
-					var lookupResult = executeQuerySync(regionLookupQuery);
-					if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows[0] != null) {
-						customerRegion = lookupResult.data.rows[0].full_name;
-					} else {
-						customerRegion = data.context.cxt_region_name;
-					}
-
-
-
-					console.log("data.context.cxt_child_incident_count_for_region=>" + data.context.cxt_child_incident_count_for_region);
-					// if no master found with child association list all masters that are found for the region.
-					if (data.context.cxt_child_incident_count_for_region == 0) {
-						var childsql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where LOWER(inc.region) = '" + customerRegion.toLowerCase() + "' and inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3)";
-						console.log("query to get Master Incident from context variable =>" + childsql);
-						//masterIncidentsDetailsResult = executeQuerySync(childsql);
-						var connection = getOracleDBConnectionRemedy(sync);
-						var masterIncidentsDetailsResult = getOracleQueryResult(connection, childsql, sync);
-						doRelease(connection);
-						outputText = DisplyDetailsForMasterIncidents(masterIncidentsDetailsResult.rows, outputText, data, conversationId);
-
-					} else {
-						//var childsql = "Select count(inc.INCIDENT_NUMBER) as COUNT ,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER AS PARENT_INCIDENT_NUMBER,inc.HPD_CI AS SITE_NAME,inc.DESCRIPTION AS SUMMARY,inc.REGION from " + incidentTableName + " inner join " + incidentTableName_2 + " on ( inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3)) AND LOWER(inc.REGION) = '" + customerRegion+ "' group by (inc.STATUS,inc.ORIGINAL_INCIDENT_NUMBER,inc.HPD_CI,inc.DESCRIPTION,inc.REGION,inc.INCIDENT_NUMBER) order by COUNT desc";
-						var masterSql = "Select distinct inc.INCIDENT_NUMBER,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,inc.ORIGINAL_INCIDENT_NUMBER AS PARENT_INCIDENT_NUMBER,inc.HPD_CI AS SITE_NAME,inc.DESCRIPTION AS SUMMARY,inc.REGION from " + incidentTableName + " inner join " + incidentTableName_2 + " on ( inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3)) AND LOWER(inc.REGION) = '" + customerRegion.toLowerCase() + "'";
-						console.log("query to get Master Incident from with child associations context variable =>" + masterSql);
-						//var masterIncidentsDetailsResult = executeQuerySync(childsql);
-						var connection = getOracleDBConnectionRemedy(sync);
-						var masterIncidentsDetailsResult = getOracleQueryResult(connection, masterSql, sync);
-						doRelease(connection);
-						console.log("masterIncidentsDetailsResult.length=>" + masterIncidentsDetailsResult.rows.length);
-						outputText = showMasterIncidentsForRegion(masterIncidentsDetailsResult.rows, outputText, data, conversationId);
-					}
-					data.context.cxt_region_show_master_incident = false;
-					data.context.cxt_region_name = null;
-
-				}
-				//	console.log("i am here 4");
-				// intent 2 :: isolated fault
-				// site name or node name flow
-				if (data != null && data.context.cxt_region_show_isolated_fault && data.context.cxt_site_name_region_flow == null && !data.context.cxt_region_flow_search_for_location) {
-					// update message for entering site with actual sites in region of query.
-					if (data.context.cxt_region_full_name != null) {
-						var listOfSitesQuery = "SELECT distinct HPD_CI as SITE_NAME FROM " + incidentTableName + " WHERE LOWER(region) = '" + data.context.cxt_region_full_name.toLowerCase() + "' AND ROWNUM < 11";
-						console.log("listOfSitesQuery =>" + listOfSitesQuery);
-						//var listOfSitesOutput = executeQuerySync(listOfSitesQuery);
-						var connection = getOracleDBConnectionRemedy(sync);
-						var listOfSitesOutput = getOracleQueryResult(connection, listOfSitesQuery, sync);
-						doRelease(connection);
-						if (listOfSitesOutput != null && listOfSitesOutput.rows.length > 0) {
-							outputText = "Do you know the site or node name. Common names in <b>" + data.context.cxt_region_full_name + "</b> are <br/>";
-							for (i = 0; i < listOfSitesOutput.rows.length; i++) {
-								if (i > 0 && i % 4 == 0) {
-									outputText += "<br/>";
-								}
-								outputText += "<a href='#' id='site-flow-" + i + "' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + listOfSitesOutput.rows[i].SITE_NAME + "</a>";
-								if (i < listOfSitesOutput.rows.length - 1)
-									outputText += ",&nbsp;";
-
-
-							}
-
-							outputText += "<br/><br/> <b>If you do not know the site or node name select <a href='#' id='no' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >No</a> to search based on Location</b>";
-						}
-						data.context.cxt_region_full_name = null;
-					}
-
-				}
-				if (data != null && data.context.cxt_region_show_isolated_fault && data.context.cxt_site_name_region_flow != null) {
-
-
-					console.log("data.context.cxt_site_name_region_show_incident_detail=>" + data.context.cxt_site_name_region_show_incident_detail);
-					var siteName = data.context.cxt_site_name_region_flow;
-					var sitenameSql = "SELECT DISTINCT REPO_LOCATION_NAME AS LOCATION_NAME from name_repo.NMG_CHATBOT_MV WHERE LOWER(CI_NAME) = '" + siteName.toLowerCase() + "'";
-					console.log("Query for matching site name oracle database table. =>" + sitenameSql);
-					var connection = getOracleDBConnection(sync);
-					var sitenameOutput = getOracleQueryResult(connection, sitenameSql, sync);
-					doRelease(connection);
-
-					if (sitenameOutput != null && sitenameOutput.rows != null && sitenameOutput.rows.length >= 1) {
-						// site name found
-						data.context.cxt_site_name_region_flow_found = true;
-						if (data.context.cxt_site_name_region_show_incident_detail) {
-
-							console.log("incidents found for site name " + data.context.cxt_site_name_region_flow);
-							var incidentSql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.status in (0,1,2,3) and LOWER(HPD_CI) = '" + data.context.cxt_site_name_region_flow.toLowerCase() + "'";// and Lower(status) != 'closed' ;";
-							console.log("query from context variable =>" + incidentSql);
-							var connection = getOracleDBConnectionRemedy(sync);
-							var listOfSitesOutput = getOracleQueryResult(connection, incidentSql, sync);
-							doRelease(connection);
-							if (listOfSitesOutput != null && listOfSitesOutput.rows != null) {
-								outputText = showIncidentsForSiteName(listOfSitesOutput.rows, outputText, data, conversationId); // this method is used for displaying incident information
-							} else {
-								listOfSitesOutput = {};
-								outputText = showIncidentsForSiteName(listOfSitesOutput, outputText, data, conversationId);
-							}
-							data.context.cxt_site_name_region_flow_found = false;
-							data.context.cxt_site_name_region_flow = null;
-
-
-						} else {
-							data.context.cxt_site_name_region_show_incident_detail = true;
-						}
-
-					} else {
-						// will look for nodes now.
-
-						var nodeName = data.context.cxt_site_name_region_flow;
-						var nodeNameSql = "Select * from nodes_lookup where node like '" + nodeName + "'";
-						console.log("Query for matching node name in nodes_lookup table. =>" + nodeNameSql);
-						var nodenameOutput = executeQuerySync(nodeNameSql);
-						if (nodenameOutput != null && nodenameOutput.data.rows != null && nodenameOutput.data.rows.length > 0) {
-							// node is found instead of sitename we will follow the region flow for site name.
-
-							data.context.cxt_site_name_region_flow_found = true; // setting flag to true to avoid site name not found message.
-
-							if (data.context.cxt_site_name_region_show_incident_detail) {
-
-								data.context.cxt_location_name_region_flow = nodenameOutput.data.rows[0].location;
-								// when we assign fetched location to context variable the location name flow will run after this.
-								data.context.cxt_site_name_region_flow = null;
-								data.context.cxt_site_name_region_flow_found = false;
-							} else {
-								data.context.cxt_site_name_region_show_incident_detail = true;
-							}
-							//outputText = data.output.text[0];
-						}
-
-
-					}
-
-
-					if (data.context.cxt_site_name_region_flow_found && data.context.cxt_site_name_region_flow != null) {
-						outputText = "Site name found do you want to see its incidents, reply with <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a>.";
-						data.context.cxt_site_name_region_flow_found = true;
-						data.context.cxt_site_name_region_show_incident_detail = true;
-
-
-					}
-					if (!data.context.cxt_site_name_region_flow_found && !data.context.cxt_site_name_region_show_incident_detail && !data.context.cxt_region_flow_search_for_location) {
-						outputText = "Site name <b>not</b> found do you want to search with location? reply with <b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a></b>.";
-						data.context.cxt_region_flow_search_for_location = true;
-						data.context.cxt_site_name_region_flow = null;
-					}
-					console.log("outputText=>" + outputText);
-					console.log("Region Flow => data.context.cxt_site_name_region_show_incident_detail=>" + data.context.cxt_site_name_region_show_incident_detail);
-				}
-				//console.log("i am here 5");
-				if (data != null && data.context.cxt_location_name_region_flow != null) {
-					data.context.cxt_location_name_region_flow_found = true;
-					console.log("data.context.cxt_location_name_region_flow_found =>" + data.context.cxt_location_name_region_flow_found);
-					var locationSql = "SELECT * from name_repo.NMG_CHATBOT_MV WHERE LOWER(REPO_LOCATION_NAME) = '" + data.context.cxt_location_name_region_flow.toLowerCase() + "'";
-					console.log("location query from context variable =>" + locationSql);
-					var connection = getOracleDBConnection(sync);
-					var locationOutput = getOracleQueryResult(connection, locationSql, sync);
-					doRelease(connection);
-					//var locationOutput = executeQuerySync(locationSql);
-					var inOperator = "(";
-					console.log("site names on location =>" + locationOutput.rows.length);
-					if (locationOutput.rows.length > 0) {
-						for (i = 0; i < locationOutput.rows.length; i++) {
-
-							inOperator += "'" + locationOutput.rows[i].CI_NAME + "'";
-
-							if (i < locationOutput.rows.length - 1) {
-								inOperator += ",";
-							}
-
-
-						}
-						inOperator += ")";
-						console.log(inOperator);
-						var incidentSql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where HPD_CI in " + inOperator + " and status in (0,1,2,3)";
-						console.log(incidentSql);
-						//var incidentOutput = executeQuerySync(incidentSql);
-						var connection = getOracleDBConnectionRemedy(sync);
-						var incidentOutput = getOracleQueryResult(connection, incidentSql, sync);
-						doRelease(connection);
-						data.context.cxt_region_flow_search_for_location = false;
-						data.context.cxt_region_full_name = null;
-						outputText = showIncidentsForRegionBasedOnLocation(incidentOutput.rows, outputText, data, conversationId);
-					} else {
-
-						outputText = "Sorry the entered location is <b>not</b> found. <br/><br/>" + data.output.text[0];
-					}
-
-					data.context.cxt_location_name_region_flow_found = false;
-					data.context.cxt_location_name_region_flow = null;
-
-
-				}
-				//console.log("i am here 6");
-				// transmission location flow : intent
-				if (data != null && data.context.cxt_location_name_trx_flow != null) {
-					console.log("data.context.cxt_location_name_trx_flow =>" + data.context.cxt_location_name_trx_flow);
-					var locationSql = "SELECT * from name_repo.NMG_CHATBOT_MV WHERE LOWER(REPO_LOCATION_NAME) = '" + data.context.cxt_location_name_trx_flow.toLowerCase() + "'";
-					console.log("location query from context variable for trx =>" + locationSql);
-					//var locationOutput = executeQuerySync(locationSql);
-					var connection = getOracleDBConnection(sync);
-					var locationOutput = getOracleQueryResult(connection, locationSql, sync);
-
-					var inOperator = "(";
-					if (locationOutput != null && locationOutput.rows.length > 0) {
-						console.log("locationOutput.rows.length =>" + locationOutput.rows.length);
-
-						data.context.cxt_location_name_trx_flow_found = true;
-						for (i = 0; i < locationOutput.rows.length; i++) {
-
-							inOperator += "'" + locationOutput.rows[i].CI_NAME + "'";
-
-							if (i < locationOutput.rows.length - 1) {
-								inOperator += ",";
-							}
-
-
-						}
-						inOperator += ")";
-						var incidentSql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.HPD_CI in " + inOperator + " and INC.INCIDENT_ASSOCIATION_TYPE = 0 AND inc.status in (0,1,2,3) AND LOWER(inc.GENERIC_CATEGORIZATION_TIER_2) = '" + data.context.cxt_tx_name.toLowerCase() + "' ";
-						console.log("incident sql =>" + incidentSql);
-						//var incidentOutput = executeQuerySync(incidentSql);
-						var connection = getOracleDBConnectionRemedy(sync);
-						var incidentOutput = getOracleQueryResult(connection, incidentSql, sync);
-						doRelease(connection);
-
-						outputText = showIncidentsForTransmissionFailureOnLocation(incidentOutput.rows, outputText, data, conversationId);
-						data.context.cxt_tx_name = null;
-
-					} else {
-						// location not found.
-						data.context.cxt_location_name_trx_flow = null;
-						data.context.cxt_location_name_trx_flow_found = false;
-					}
-
-
-				} else {
-					// update location message for Transmission failure here.	
-
-
-				}
-
-				
-				console.log("data =>" + JSON.stringify(data));
-				if (data!=null && data.context.cxt_matched_customer_count > 1 && data.entities[0].entity == 'yes' && data.context.cxt_customer_drill_down_region == null) {
-				
-					var sql = data.context.cxt_customer_region_list_query;
-					var connection = getOracleDBConnection(sync);
-					var listOfRegionForCustomer = getOracleQueryResult(connection, sql, sync);
-					if (listOfRegionForCustomer.rows.length > 0) {
-						var custRegion = null;
-						
-						var regionList = "<table class='w-30'><tr>";
-						regionList += "<td><ul>";
-						var rowCounter = 0;
-						for (i = 0; i < listOfRegionForCustomer.rows.length; i++) {
-							custRegion = listOfRegionForCustomer.rows[i].REGION;
-							regionList += "<li><a href='#' id='"+custRegion+"' title='Click to paste value' onclick='copyToTypingArea(this);'>"+custRegion+"</a></li>";
-							rowCounter++;
-							if (i > 0 && rowCounter % 4 == 0) {
-								regionList += "</ul></td><td><ul>";
-							}
-						}
-
-						regionList += "</ul></td>";
-						regionList += "</tr></table>";
-						outputText = S(data.output.text[0]).replaceAll('[region_list_for_customer]', regionList).s;
-					}
-				}
-				if (data.context.cxt_user_selected_customer == null && data.context.cxt_customer_query != null && data.context.cxt_customer_drill_down_region != null && data.context.cxt_incident_data_for_customer && data.context.cxt_matched_customer_count > 1) {
-
-					var sql = data.context.cxt_customer_query;
-					sql += " AND LOWER(REGION) = '" + data.context.cxt_customer_drill_down_region.toLowerCase() + "'"
-					console.log("Customer Query When region is specified in start =>" + sql);
-					var connection = getOracleDBConnection(sync);
-					var listOfCustomerOutput = getOracleQueryResult(connection, sql, sync);
-					doRelease(connection);
-					var matchedCustomerOnRegion = "<table class='w-50'><tr>";
-					var customerArr = [];
-					var customerName = null;
-					data.context.cxt_matched_customer_count = listOfCustomerOutput.rows.length;
-					if (listOfCustomerOutput.rows.length > 0) {
-
-						for (i = 0; i < listOfCustomerOutput.rows.length; i++) {
-							customerArr[i] = listOfCustomerOutput.rows[i].MPLSVPN_NAME
-							matchedCustomerOnRegion += "<tr>";
-							customerName = listOfCustomerOutput.rows[i].MPLSVPN_NAME;
-							customerName = handleDigitsWithSlashInCustomerName(customerName);
-							matchedCustomerOnRegion += "<td><a href='#' id='cust_name_" + i + getRandomInt() + "' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + customerName + "</a></td>";
-							matchedCustomerOnRegion += "<td>" + listOfCustomerOutput.rows[i].IFACE_VLANID + "</td>";
-							//matchedCustomerOnRegion += "<td>" + listOfCustomerOutput.rows[i].REGION + "</td>";
-							matchedCustomerOnRegion += "</tr>";
-
-
-
-						}
-						matchedCustomerOnRegion += "</table>";
-
-						console.log("outputText=>" + data.output.text[0]);
-
-						outputText = S(data.output.text[0]).replaceAll('[region_filtered_customer_list]', matchedCustomerOnRegion).s;
-						outputText = S(outputText).replaceAll('[region_cust_count]', data.context.cxt_matched_customer_count).s;
-					} else {
-						outputText = "<br/><b>Sorry no result found for specified customer in " + data.context.cxt_customer_drill_down_region + ".&nbsp; Click on <a href='#' id='yes' onclick='copyToTypingArea(this);'>yes</a> to search again.</b>";
-
-					}
-					data.context.cxt_incident_data_for_customer = false;
-
-				}
-				// when customer is picked up from the list of customers returned by watson or db
-				if (data.context.cxt_user_selected_customer != null) {
-
-					//var sql = data.context.cxt_customer_query;
-					// show incident data here for selected customer.
-					data.context.cxt_user_selected_customer = restoreDigitsWithSlashInCustomerName(data.context.cxt_user_selected_customer);
-
-					var sql = "Select NID,MPLSVPN_NAME,IFNR,IFALIAS,IFACCURSTRING,NODE_NM from  tellabs_ods.ebu_vlan_status_mv where LOWER(MPLSVPN_NAME) = '" + data.context.cxt_user_selected_customer.toLowerCase() + "'"
-					console.log(sql);
-					var connection = getOracleDBConnection(sync);
-					var output = getOracleQueryResult(connection, sql, sync);
-					doRelease(connection);
-					console.log("node count for customer =>" + output.rows.length);
-					var nodeId = null;
-					if (output != null && output.rows != null && output.rows.length >= 1) {
-
-						nodeId = output.rows[0].NID;
-						outputText = "<table class='w-50'><tr>";
-						for (i = 0; i < output.rows.length; i++) {
-							outputText += "<td>";
-							outputText += output.rows[i].MPLSVPN_NAME + "<br/>" + output.rows[i].IFNR + "<br/>" + output.rows[i].IFALIAS + "<br/>"
-								+ output.rows[i].IFACCURSTRING + "<br/>" + output.rows[i].NID + "<br/>" + output.rows[i].NODE_NM + "<br/><br/>";
-							outputText += "</td>";
-							if (i > 2 && i % 3 == 0) {
-								outputText += "</tr><tr>";
-							}
-
-						}
-						outputText += "</tr></table>";
-						outputText += "<b>Want to see incident details <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a>&nbsp;<a href='#' id='no' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>no</a></b>.";
-						//data.context.cxt_user_selected_customer = null;
-						data.context.node_output_query = sql;
-					} else {
-						outputText = "<b>There are no nodes available for this corporate customer. Please click <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a> to do another search.</b>.";
-						data = resetCustomerContext(data);
-						// there are no nodes for this customer, handle here.
-					}
-
-				}
-
-				console.log("data.context.cxt_customer_show_incident_data=>" + data.context.cxt_customer_show_incident_data);
-				if (data.context.cxt_customer_show_incident_data && data.context.node_output_query != null) {
-
-					data.context.cxt_customer_flow_node_detail_query_executed = true; // this flag will help to clear the context variables for customer.
-					//data.context.cxt_customer_input_text = null;
-					var connection = getOracleDBConnection(sync);
-					var output = getOracleQueryResult(connection, data.context.node_output_query, sync);
-					doRelease(connection);
-					var nodeId = null;
-
-					if (output != null) {
-						nodeId = output.rows[0].NID;
-					}
-
-
-					var nodeOutput = null;
-					if (nodeId != null) {
-						var nodeSql = "Select " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and (inc.HPD_CI in('NODE" + nodeId + "'";
-						for (j = 1; j < output.rows.length; j++) {
-							nodeId = output.rows[j].NID;
-							nodeSql += " , 'NODE" + nodeId + "'"
-						}
-						nodeSql += "))";
-						console.log(nodeSql);
-						var connection = getOracleDBConnectionRemedy(sync);
-						nodeOutput = getOracleQueryResult(connection, nodeSql, sync);
-						doRelease(connection);
-					}
-
-					if (nodeOutput != null && nodeOutput.rows.length == 0) {
-
-
-						outputText = "<br/><b>I could not find any incident data for this customer in Remedy. If you like to speak to an operator please dial 082918.<br/></b>";
-						//console.log("incident data not found for customer=>" + outputText);
-						data.context.cxt_incident_data_for_customer = false;
-
-
-					} else {
-						console.log("incident data found for customer");
-						outputText = "<table class='w-100'>";
-						outputText += "<tr><th>INCIDENT NUMBER</th><th>DESCRIPTION</th><th>STATUS</th><th>SITE NAME</th></tr>";
-						for (i = 0; i < nodeOutput.rows.length; i++) {
-
-
-							outputText += "<tr><td>" + nodeOutput.rows[i].INCIDENT_NUMBER + "</td><td>" + nodeOutput.rows[i].SUMMARY + "</td><td>" + nodeOutput.rows[i].INC_STATUS + "</td><td>" + nodeOutput.rows[i].SITE_NAME + "</td></tr>";
-
-						}
-						outputText += "</table><br/>";
-
-					}
-
-					outputText = addFeedbackButton(outputText);
-					if (data.output.text[0] != null)
-						outputText += data.output.text[0]; // what else i can do for you message.
-					else
-						outputText += data.output.text[1]; // what else i can do for you message.
-
-
-					// put this reset variable here for fixing an issue related to corporate customer. will check and decide accordingly.
-					if (data.context.cxt_unknown_customer_case) {
-						data.context.cxt_customer_flow_found = null;
-						data.context.cxt_unknown_input = null;
-						data.context.cxt_matched_customer_list = null;
-						data.context.cxt_customer_input_text = null;
-						data.context.cxt_unknown_customer_case = false;
-						data.context.node_output_query = null;
-						data.context.cxt_matched_customer_count = 0;
-					}
-					// clearing context for corporate customer
-					data = resetCustomerContext(data);
-
-				} else if(data!=null && data.context.node_output_query !=null && data.entities[0].entity == 'No') {
-					// clearing context for corporate customer
-					data = resetCustomerContext(data);
-					 // setting it true for the case when someone says no for incident data this flag will clear the context variables.
-				}
-
-
-
-
-
-
-
-				if (data != null && data.context.cxt_user_logged_in) {
+				if (response != null && response.context.cxt_user_logged_in) {
 
 					console.log("user is logged in now checking intent");
 					/* SITES intent and context variable code */
-					outputText = handleSitesIntent(data, inputText, outputText, sync);
+					response.output.text = handleSitesIntent(response, inputText, response.output.text, sync);
 
 					/*Incident Intent Handling.*/
-					outputText = handleIncidentIntent(data, inputText, outputText, incidentFlow, sync);
+					response.output.text = handleIncidentIntent(response, inputText, incidentFlow, sync);
+					
 
 					/*Corporate Customer Intent handling.*/
-					outputText = handleCustomerIntent(data, inputText, outputText, incidentFlow, sync);
+					response.output.text = handleCustomerIntent(response, inputText, response.output.text, incidentFlow, sync);
 
 					/*Region Intent Handling.*/
-					outputText = handleRegionIntent(data, inputText, outputText, sync);
+					response.output.text = handleRegionIntent(response, inputText, response.output.text, sync);
 
 					/*
 						transmission failure Intent handling.
 					*/
-					outputText = handleTransmissionFailureIntent(data, inputText, outputText, sync);
-
-
+					response.output.text = handleTransmissionFailureIntent(response, inputText, response.output.text, sync);
 					/*
 					Escalation Intent Handling.
 					*/
-					outputText = handleEscalationIntent(data, inputText, outputText, await, defer, discovery);
+					response.output.text = handleEscalationIntent(response, inputText, response.output.text, await, defer, discovery);
 
 
-					//console.log("replacing location name in message if there are any.");
-					if (data.output.text[0] != null && S(data.output.text[0]).contains('Common locations are') && data.context.cxt_location_name_trx_flow == null && data.context.cxt_region_name != null) {
-						//console.log("replacing location name in message if there are any.");
-						data.output.text[0] = updateSuggestedLocationsInMessage(data.output.text[0], data.context.cxt_region_name, sync);
+					console.log("response.context.cxt_location_list_trx_failure_query =>" + response.context.cxt_location_list_trx_failure_query);
+					if (response != null && response.output.text[0] != null && response.context.cxt_location_list_trx_failure_query != null && response.context.cxt_location_name_trx_flow == null) {
+						console.log("replacing location name in message if there are any.");
+						response.output.text[0] = updateSuggestedLocationsInMessage(response.output.text[0], response.context.cxt_location_list_trx_failure_query, sync);
 					}
 				}
+				
+				response = userLoginWithContext(response);
+				
 
-				if (data != null && !data.context.cxt_user_logged_in && data.context.cxt_verify_user) {
-					console.log("verifying user credentials");
-
-					if (data.context.cxt_user_email != null && data.context.cxt_user_password != null) {
-						var loginQuery = "Select first_name,last_name from bot_users where email = '" + data.context.cxt_user_email + "' and password = '" + data.context.cxt_user_password + "';";
-						var loginOutPut = executeQuerySync(loginQuery);
-						if (loginOutPut.data.rows.length != 0) {
-							console.log("credentials verified");
-							data.context.cxt_user_logged_in = true;
-							data.context.cxt_user_full_name = loginOutPut.data.rows[0].first_name + " " + loginOutPut.data.rows[0].last_name;
-							userFullName = data.context.cxt_user_full_name;
-							//outputText = data.output.text[0];//"Your credentials are verified. You are now logged in. ";
-							
-							
-						} else {
-							console.log("credentials not verified");
-							//if ()
-							outputText = data.output.text[0];
-							if (data.output.text[1] != null) {
-								outputText += data.output.text[1];
-							}
-							//console.log(outputText);
-							data.context.cxt_user_email = null;
-							data.context.cxt_user_password = null;
-							data.context.cxt_user_logged_in = false;
-							data.context.cxt_verify_user = false;
-						}
-					}
-
-
+				if (response) {
+					all_output = response;
 				}
+				return res.json(updateMessage(payload, response));
 
-							
-				if (data) {
-					all_output = data;
-				} else {
-					outputText = "Conversation service is not responding in timely manner. Sorry for inconvenience.";
-				}
-				return res.json(updateMessage(payload, data));
 			});
+			
+
 		} catch (err) {
 			//TODO Handle error
 			console.log("error=>" + JSON.stringify(err.stack));
@@ -680,10 +203,11 @@ app.get('/feedbackOptions', function (req, res) {
 	var query = url.parse(req.url, true).query;
 	//console.log(query.reason);
 	var feedbackReason = query.reason;
+	var feedbackReasonText = query.reasonText;
 	if (feedbackReason && all_output) {
 		//console.log(all_output);
 		var feedback_value = -1; // -1 is for thumbs down
-		recordFeedback(all_output, feedbackReason, feedback_value);
+		recordFeedback(all_output, feedbackReason, feedback_value,feedbackReasonText);
 	}
 })
 
@@ -706,7 +230,7 @@ app.get('/feedback', function (req, res) {
 
 
 
-function recordFeedback(all_output, feedbackReason, feedback_value) {
+function recordFeedback(all_output, feedbackReason, feedback_value,feedbackReasonText) {
 	console.log("feedbackReason =>" + JSON.stringify(feedbackReason));
 	var input_text = all_output.input.text;
 	if (input_text) {
@@ -748,7 +272,7 @@ function recordFeedback(all_output, feedbackReason, feedback_value) {
 		lastUsedEntity = entity;
 	}
 	console.log("last used intent" + JSON.stringify(lastUsedIntent));
-	var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','" + all_output.context.conversation_id + "'," + feedbackReason + ");";
+	var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment,feedback_comment_other) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','" + all_output.context.conversation_id + "'," + feedbackReason + ",'"+feedbackReasonText+"');";
 	//console.log("query insert feedback =>" + feedback_sql);
 	var output = executeQuerySync(feedback_sql);
 	if (output.success) {
@@ -790,29 +314,39 @@ function recordResponseTime(response) {
  * @return {Object}          The response with the updated message
  */
 function updateMessage(input, response) {
-	var responseText = null;
+	//var responseText = null;
+	console.log("updateMessage=>" + response);
 	if (response != null) {
 
 		if (!response.output) {
 			response.output = {};
 		} else {
-			//return response;
-		}
-		//console.log("response =>" + JSON.stringify(response));
-		//console.log("outputText=>"+outputText);
-		if (outputText != null) {
-
-			response.output.text = outputText;
-			lastOutputText = outputText;
+			lastOutputText = response.output.text;
 			recordResponseTime(response); // record time for every conversation message to get time of chat for one intent.
+			return response;
 		}
+
 	}
 	//outputText = null;
 	return response;
 }
 
-
-
-
+/*var container = document.querySelector('.rating');
+var star = document.querySelector('.star');
+star.parentNode.removeChild(star);
+ 
+var rating = new Rating([1, 2, 3, 4, 5], {
+  container: container,
+  star: star
+});
+ 
+rating.on('rate', function(weight) {
+  console.log('rated: ' + weight);
+});
+ 
+rating.on('select', function(weight) {
+  console.log('current: ' + weight);
+});*/
 
 module.exports = app;
+
