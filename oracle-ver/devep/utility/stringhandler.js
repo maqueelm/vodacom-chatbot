@@ -92,7 +92,7 @@ module.exports = function () {
         data.context.cxt_customer_region_list_query = null;
         data.context.cxt_unknown_input = null;
         data.context.cxt_complex_customer = null;
-        data.context.cxt_complex_customer_case = true;
+        data.context.cxt_complex_customer_case = false;
         data.context.cxt_user_selected_customer = null;
         data.context.cxt_plain_customer_name_case = false;
         return data;
@@ -129,6 +129,9 @@ module.exports = function () {
         data.context.cxt_tx_name = null;
         data.context.cxt_tx_found_incident_count = -1;
         data.context.cxt_location_list_trx_failure_query = null;
+        data.context.cxt_location_name_trx_flow_found = false;
+        data.context.cxt_location_name_trx_flow = null;
+        data.context.cxt_tech_type_region = null;
         return data;
     }
 

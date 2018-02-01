@@ -23,7 +23,6 @@ var bodyParser = require('body-parser'); // parser for post requests
 var Conversation = require('watson-developer-cloud/conversation/v1'); // watson sdk
 var DiscoveryV1 = require('watson-developer-cloud/discovery/v1');
 var striptags = require('striptags');
-var Rating = require('rating');
 /* Variables Declaration */
 
 var app = express();
@@ -80,7 +79,7 @@ var conversation = new Conversation({
 });
 
 var discovery = new DiscoveryV1({ username: process.env.DISCOVERY_SERVICE_USERNAME, password: process.env.DISCOVERY_SERVICE_PASSWORD, version_date: process.env.DISCOVERY_SERVICE_VERSION_DATE })
-//console.log("correct Incident Number =>"+correctIncidentNumberFormat("INC000003341513"));
+
 // Endpoint to be call from the client side
 app.post('/api/message', function (req, res) {
 	var workspace = process.env.WORKSPACE_ID || '<workspace-id>';
@@ -96,94 +95,111 @@ app.post('/api/message', function (req, res) {
 		context: req.body.context || {},
 		input: req.body.input || {}
 	};
-	// Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
-	// data contains response 
-	conversation.message(payload, function (err, response) {
-		try {
-
-			fiber(function () {
-				if (err) {
-					//return res.status(err.code || 500).json(err);
-					res.status(err.code >= 100 && err.code < 600 ? err.code : 500);
-				}
-				if (req.body.input != null) {
-					inputText = req.body.input.text;
-					//console.log("Input provided is => "+req.body.input.text);
-				}
-				//outputText = null;
-				conversationId = payload.context.conversation_id;
-				console.log(JSON.stringify(response));
-				if (response != null) {
-					response = startOverConversationWithContext(response);
-
-					response = showChildIncidentsWithContext(response,sync,conversationId);
-
-					response = showParentIncidentDetailsWithContext(response,sync);
-
-					response = showMasterIncidentForRegionWithContext(response, sync, conversationId);
-
-					response = regionIntentIsolatedFaultFlowWithContext(response, sync,conversationId);
-
-					response = technologyTypeFlowWithContext(response, sync,conversationId);
-
-					response = corporateCustomerFlowWithContext(response, sync);
-				}
-				//console.log("response =>" + JSON.stringify(response));
-
-				if (response != null && response.context.cxt_user_logged_in) {
-
-					console.log("user is logged in now checking intent");
-					/* SITES intent and context variable code */
-					response.output.text = handleSitesIntent(response, inputText, response.output.text, sync);
-
-					/*Incident Intent Handling.*/
-					response.output.text = handleIncidentIntent(response, inputText, incidentFlow, sync);
-					
-
-					/*Corporate Customer Intent handling.*/
-					response.output.text = handleCustomerIntent(response, inputText, response.output.text, incidentFlow, sync);
-
-					/*Region Intent Handling.*/
-					response.output.text = handleRegionIntent(response, inputText, response.output.text, sync);
-
-					/*
-						transmission failure Intent handling.
-					*/
-					response.output.text = handleTransmissionFailureIntent(response, inputText, response.output.text, sync);
-					/*
-					Escalation Intent Handling.
-					*/
-					response.output.text = handleEscalationIntent(response, inputText, response.output.text, await, defer, discovery);
 
 
-					console.log("response.context.cxt_location_list_trx_failure_query =>" + response.context.cxt_location_list_trx_failure_query);
-					if (response != null && response.output.text[0] != null && response.context.cxt_location_list_trx_failure_query != null && response.context.cxt_location_name_trx_flow == null) {
-						console.log("replacing location name in message if there are any.");
-						response.output.text[0] = updateSuggestedLocationsInMessage(response.output.text[0], response.context.cxt_location_list_trx_failure_query, sync);
-					}
-				}
-				
-				response = userLoginWithContext(response);
-				
+	if (req.body.input != null) {
+		inputText = req.body.input.text;
+		//console.log("Input provided is => "+req.body.input.text);
+	}
 
-				if (response) {
-					all_output = response;
-				}
-				return res.json(updateMessage(payload, response));
+	try {
 
-			});
+		fiber(function () {
 			
 
-		} catch (err) {
-			//TODO Handle error
-			console.log("error=>" + JSON.stringify(err.stack));
-		}
+			conversationId = payload.context.conversation_id;
+			response = getWatsonResponse(payload, sync);
+			console.log(JSON.stringify(response));
+			if (response != null) {
+				response = startOverConversationWithContext(response);
+
+				response = showChildIncidentsWithContext(response, sync, conversationId);
+
+				response = showParentIncidentDetailsWithContext(response, sync);
+
+				response = showMasterIncidentForRegionWithContext(response, sync, conversationId);
+
+				response = regionIntentIsolatedFaultFlowWithContext(response, sync, conversationId);
+
+				response = technologyTypeFlowWithContext(response, sync, conversationId);
+
+				response = corporateCustomerFlowWithContext(response, sync);
+			}
+			//console.log("response =>" + JSON.stringify(response));
+
+			if (response != null && response.context.cxt_user_logged_in) {
+
+				console.log("user is logged in now checking intent");
+				/* SITES intent and context variable code */
+				response.output.text = handleSitesIntent(response, inputText, response.output.text, sync);
+
+				/*Incident Intent Handling.*/
+				response.output.text = handleIncidentIntent(response, inputText, incidentFlow, sync);
 
 
-	});
+				/*Corporate Customer Intent handling.*/
+				response.output.text = handleCustomerIntent(response, inputText, response.output.text, incidentFlow, sync);
+
+				/*Region Intent Handling.*/
+				response.output.text = handleRegionIntent(response, inputText, response.output.text, sync);
+
+				/*
+					transmission failure Intent handling.
+				*/
+				response.output.text = handleTransmissionFailureIntent(response, inputText, response.output.text, sync);
+				/*
+				Escalation Intent Handling.
+				*/
+				response.output.text = handleEscalationIntent(response, inputText, response.output.text, await, defer, discovery);
 
 
+				console.log("response.context.cxt_location_list_trx_failure_query =>" + response.context.cxt_location_list_trx_failure_query);
+				if (response != null && response.output.text[0] != null && response.context.cxt_location_list_trx_failure_query != null && response.context.cxt_location_name_trx_flow == null) {
+					console.log("replacing location name in message if there are any.");
+					response.output.text[0] = updateSuggestedLocationsInMessage(response.output.text[0], response.context.cxt_location_list_trx_failure_query, sync);
+				}
+			}
+
+			response = userLoginWithContext(response);
+
+
+
+			if (response) {
+				all_output = response;
+			}
+
+			return res.json(updateMessage(payload, response));
+
+		});  // fiber ends here
+
+
+	} catch (err) {
+		//TODO Handle error
+		console.log("error=>" + JSON.stringify(err.stack));
+	}
 });
+
+function sendMessageToWatson(app,request,sync) {
+
+	var res = sync.await(app.post('/api/message',request, sync.defer()));
+	return res;
+}
+
+function getWatsonResponse(payload, sync) {
+
+	// Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
+	var response = null;
+	try {
+		response = sync.await(conversation.message(payload, sync.defer()));
+
+	} catch (err) {
+		//TODO Handle error
+		console.log("error=>" + JSON.stringify(err.message));
+	}
+	return response;
+
+
+}
 
 
 
@@ -207,7 +223,7 @@ app.get('/feedbackOptions', function (req, res) {
 	if (feedbackReason && all_output) {
 		//console.log(all_output);
 		var feedback_value = -1; // -1 is for thumbs down
-		recordFeedback(all_output, feedbackReason, feedback_value,feedbackReasonText);
+		recordFeedback(all_output, feedbackReason, feedback_value, feedbackReasonText,0);
 	}
 })
 
@@ -228,9 +244,25 @@ app.get('/feedback', function (req, res) {
 	}
 })
 
+app.get('/rating', function (req, res) {
+	var query = url.parse(req.url, true).query;
+	var ratingValue = query.ratingVal;
+	
+	if (ratingValue > 0) {
+		console.log("ratingValue =>" + JSON.stringify(ratingValue));
+		var recordInserted = recordFeedback(all_output, null, 1, null,ratingValue);
+		if (recordInserted) {
+			res.send('1');
+		}
+		
+	}
+	
+	/*if (save_data && all_output) {
+		recordFeedback(all_output, null, feedback_value);
+	}*/
+})
 
-
-function recordFeedback(all_output, feedbackReason, feedback_value,feedbackReasonText) {
+function recordFeedback(all_output, feedbackReason, feedback_value, feedbackReasonText,ratingValue) {
 	console.log("feedbackReason =>" + JSON.stringify(feedbackReason));
 	var input_text = all_output.input.text;
 	if (input_text) {
@@ -244,8 +276,16 @@ function recordFeedback(all_output, feedbackReason, feedback_value,feedbackReaso
 	if (outputText != null) {
 
 		lastOutputText = striptags(outputText);
+		lastOutputText = S(lastOutputText).replaceAll('?file', 'file').s;
+		lastOutputText = S(lastOutputText).replaceAll("openExcelDownloadWindow('", "openExcelDownloadWindow").s;
+		lastOutputText = S(lastOutputText).replaceAll("')>Download", "Download").s;
+		
+		//lastOutputText = S(lastOutputText).escapeHTML().s;
 	} else {
 		lastOutputText = striptags(lastOutputText);
+		lastOutputText = S(lastOutputText).replaceAll('?file', 'file').s;
+		lastOutputText = S(lastOutputText).replaceAll("openExcelDownloadWindow('", "openExcelDownloadWindow").s;
+		lastOutputText = S(lastOutputText).replaceAll("')>Download", "Download").s;
 	}
 
 
@@ -272,11 +312,21 @@ function recordFeedback(all_output, feedbackReason, feedback_value,feedbackReaso
 		lastUsedEntity = entity;
 	}
 	console.log("last used intent" + JSON.stringify(lastUsedIntent));
-	var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment,feedback_comment_other) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','" + all_output.context.conversation_id + "'," + feedbackReason + ",'"+feedbackReasonText+"');";
+	var feedback_sql = '';
+	if (ratingValue > 0) {
+		console.log("Insert feedback with rating =>" + JSON.stringify(ratingValue));
+		feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,rating_value) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','" + all_output.context.conversation_id + "',"+ratingValue+");";
+	} else{
+		feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment,feedback_comment_other) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','" + all_output.context.conversation_id + "'," + feedbackReason + ",'" + feedbackReasonText + "');";
+	}
 	//console.log("query insert feedback =>" + feedback_sql);
 	var output = executeQuerySync(feedback_sql);
+	console.log("output =>" + JSON.stringify(output));
 	if (output.success) {
 		console.log("Feedback Inserted into database");
+		return true;
+	} else {
+		return false;
 	}
 }
 
@@ -331,22 +381,6 @@ function updateMessage(input, response) {
 	return response;
 }
 
-/*var container = document.querySelector('.rating');
-var star = document.querySelector('.star');
-star.parentNode.removeChild(star);
- 
-var rating = new Rating([1, 2, 3, 4, 5], {
-  container: container,
-  star: star
-});
- 
-rating.on('rate', function(weight) {
-  console.log('rated: ' + weight);
-});
- 
-rating.on('select', function(weight) {
-  console.log('current: ' + weight);
-});*/
 
 module.exports = app;
 

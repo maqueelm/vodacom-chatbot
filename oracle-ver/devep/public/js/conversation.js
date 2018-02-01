@@ -35,13 +35,14 @@ var ConversationPanel = (function () {
     var currentRequestPayloadSetter = Api.setRequestPayload;
     Api.setRequestPayload = function (newPayloadStr) {
       currentRequestPayloadSetter.call(Api, newPayloadStr);
+      
       displayMessage(JSON.parse(newPayloadStr), settings.authorTypes.user);
     };
 
     var currentResponsePayloadSetter = Api.setResponsePayload;
     Api.setResponsePayload = function (newPayloadStr) {
       currentResponsePayloadSetter.call(Api, newPayloadStr);
-      displayMessage(JSON.parse(newPayloadStr), settings.authorTypes.watson);
+       displayMessage(JSON.parse(newPayloadStr), settings.authorTypes.watson);
     };
   }
 
@@ -128,16 +129,24 @@ var ConversationPanel = (function () {
       // Previous "latest" message is no longer the most recent
       if (previousLatest) {
         Common.listForEach(previousLatest, function (element) {
-          element.classList.remove('latest');
+           element.classList.remove('latest');
+           
+            
         });
       }
 
+      
       messageDivs.forEach(function (currentDiv) {
-        chatBoxElement.appendChild(currentDiv);
-        // Class to start fade in animation
-        currentDiv.classList.add('load');
+        chatBoxElement.appendChild(currentDiv);  
+       currentDiv.classList.add('load');
       });
-      // Move chat to the most recent messages when new messages are added
+      $("#textInput").removeClass("gif-loader");
+      $("#textInput").removeClass("agent-waiting-msg");
+      $("#textInput").attr("placeholder", "Type something");
+      
+
+       
+     // Move chat to the most recent messages when new messages are added
       scrollToChatBottom();
     }
   }
@@ -188,6 +197,7 @@ var ConversationPanel = (function () {
                 'text': isUser ? '<img class="chat-user" alt="user-logo" src="img/humanicon2.png">' : '<img class="chat-whatson" alt="whatson-logo" src="img/whatsonicon.png">'
               }]
             },
+                       
             {
               // <div class='from-user/from-watson latest'>
               'tagName': 'div',
@@ -202,7 +212,11 @@ var ConversationPanel = (function () {
                   'text': currentText + "<br/><span class='timestamp'>"+getDateTime()+"</span>"
                 }]
               }]
-            }]
+            },
+            
+          
+          ],
+          
         };
         messageArray.push(Common.buildDomElement(messageJson));
       }
@@ -242,7 +256,10 @@ var ConversationPanel = (function () {
 
       // Send the user message
       Api.sendRequest(inputBox.value, context);
-
+      //$("#textInput").css
+     // $("#textInput").addClass("agent-waiting-msg");
+        agentInputProgressBar();
+      
       // Clear input box for further messages
       inputBox.value = '';
       Common.fireEvent(inputBox, 'input');
@@ -253,9 +270,15 @@ var ConversationPanel = (function () {
         var date = new Date();
     
         var hour = date.getHours();
-        
+
+                
         hour = (hour < 10 ? "0" : "") + hour;
 
+       /* if (hour == 0){
+          hour = 24 - 3;
+        } else {
+          hour -3;
+        }*/
         
 
         var min  = date.getMinutes();
@@ -280,5 +303,20 @@ var ConversationPanel = (function () {
         } 
         return formatedTime;
     
+    }
+    function agentInputProgressBar(){
+        $("#textInput").addClass("gif-loader");
+        $("#textInput").addClass("agent-waiting-msg");
+        $("#textInput").attr("placeholder", "Agent is typing " ); 
+        
+      
+        
+       
+
+      
+      
+
+
+
     }
 }());

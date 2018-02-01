@@ -51,40 +51,44 @@ module.exports = function () {
             console.log("SiteName Query=>" + lookForSiteNames);
             //var lookForSiteNamesData = executeQuerySync(lookForSiteNames);
             var connection = getOracleDBConnection(sync);
-            var lookForSiteNamesData = getOracleQueryResult(connection, lookForSiteNames, sync);
-            doRelease(connection);
-
-            if (lookForSiteNamesData != null && lookForSiteNamesData.rows.length > 0) {
-                // look for incident based on the site.
-                console.log("site name found in db");
-                data.context.cxt_ci_site_name_found_in_db = true;
-                console.log("siteNodePattern=>" + siteNodePattern);
-                if (siteNodePattern || siteNamePattern) {
-                    // add this node in watson learning for sitenames
-                    console.log("Adding to 2g-sites entity=>" + data.context.cxt_ci_flow_site_name);
-                    createEntityValue(data.context.cxt_ci_flow_site_name, "2g-sites");
-                }
-
-            } else {
-                // site name not found
-                console.log("site name not found in db");
-                data.context.cxt_ci_site_name_found_in_db = false;
-                data.output.text = "Site name <b>not</b> found. Would you like to do another search? Reply with <b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >Yes</a> </b>.";
-                data.context.cxt_ci_flow_site_name = null;
-
-            }
-            console.log("data.context.cxt_ci_flow_show_incident=>" + data.context.cxt_ci_flow_show_incident);
-            if (data.context.cxt_ci_site_name_found_in_db && data.context.cxt_ci_flow_show_incident) {
-                var childCount = 0;
-                var incidentSql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and LOWER(inc.HPD_CI) like '" + data.context.cxt_ci_flow_site_name.toLowerCase() + "%'";
-                console.log("incidents on site name=>" + incidentSql);
-                //var incidentResult = executeQuerySync(incidentSql);
-                var connection = getOracleDBConnectionRemedy(sync);
-                var incidentResult = getOracleQueryResult(connection, incidentSql, sync);
+            if (connection) {
+                var lookForSiteNamesData = getOracleQueryResult(connection, lookForSiteNames, sync);
                 doRelease(connection);
-                data.output.text = showIncidentsForSiteName(incidentResult.rows, outputText, data, data.context.conversation_id);
-                data.context.cxt_ci_site_name_found_in_db = false;
-                data.context.cxt_ci_flow_site_name = null;
+
+                if (lookForSiteNamesData != null && lookForSiteNamesData.rows.length > 0) {
+                    // look for incident based on the site.
+                    console.log("site name found in db");
+                    data.context.cxt_ci_site_name_found_in_db = true;
+                    console.log("siteNodePattern=>" + siteNodePattern);
+                    if (siteNodePattern || siteNamePattern) {
+                        // add this node in watson learning for sitenames
+                        console.log("Adding to 2g-sites entity=>" + data.context.cxt_ci_flow_site_name);
+                        createEntityValue(data.context.cxt_ci_flow_site_name, "2g-sites");
+                    }
+
+                } else {
+                    // site name not found
+                    console.log("site name not found in db");
+                    data.context.cxt_ci_site_name_found_in_db = false;
+                    data.output.text = "Site name <b>not</b> found. Would you like to do another search? Reply with <b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >Yes</a> </b>.";
+                    data.context.cxt_ci_flow_site_name = null;
+
+                }
+                console.log("data.context.cxt_ci_flow_show_incident=>" + data.context.cxt_ci_flow_show_incident);
+                if (data.context.cxt_ci_site_name_found_in_db && data.context.cxt_ci_flow_show_incident) {
+                    var childCount = 0;
+                    var incidentSql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and LOWER(inc.HPD_CI) like '" + data.context.cxt_ci_flow_site_name.toLowerCase() + "%'";
+                    console.log("incidents on site name=>" + incidentSql);
+                    //var incidentResult = executeQuerySync(incidentSql);
+                    var connection = getOracleDBConnectionRemedy(sync);
+                    var incidentResult = getOracleQueryResult(connection, incidentSql, sync);
+                    doRelease(connection);
+                    data.output.text = showIncidentsForSiteName(incidentResult.rows, outputText, data, data.context.conversation_id);
+                    data.context.cxt_ci_site_name_found_in_db = false;
+                    data.context.cxt_ci_flow_site_name = null;
+                }
+            } else {
+                data.output.text = "<b>Sorry, i could not connect to data source for fetching the requested information. Please try again later.</b>";
             }
         }
         return data.output.text;
@@ -130,37 +134,57 @@ module.exports = function () {
                         locatoinForFailureSql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) = '" + tier_cause_search_term.toLowerCase() + "'";
                     }
 
-                   // locatoinForFailureSql += " and rownum < 999";
+                    if (data.context.cxt_tech_type_region != null) {
+
+                        var regionLookupQuery = "Select * from region_lookup where (LOWER(abbreviation) = '" + data.context.cxt_tech_type_region.toLowerCase() + "' OR LOWER(full_name) = '" + data.context.cxt_tech_type_region.toLowerCase() + "')";
+                        console.log("lookup query =>" + regionLookupQuery);
+                        var lookupResult = executeQuerySync(regionLookupQuery);
+                        var regionFullName = '';
+                        if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows[0] != null) {
+                            regionFullName = lookupResult.data.rows[0].full_name;
+                        }
+
+                        locatoinForFailureSql += " and LOWER(inc.region) = '" + regionFullName.toLowerCase() + "'";
+                    }
+
+                    // locatoinForFailureSql += " and rownum < 999";
 
 
                     console.log("locatoinForFailureSql=>" + locatoinForFailureSql);
                     //output = executeQuerySync(sql);
                     var connection = getOracleDBConnectionRemedy(sync);
-                    var locationForFailureoutput = getOracleQueryResult(connection, locatoinForFailureSql, sync);
-                    doRelease(connection);
+                    if (connection) {
+                        var locationForFailureoutput = getOracleQueryResult(connection, locatoinForFailureSql, sync);
+                        doRelease(connection);
 
-                    if (locationForFailureoutput != null && locationForFailureoutput.rows.length > 0) {
-                        console.log("locationForFailureoutput.rows.length =>" + locationForFailureoutput.rows.length);
-                        var inOperator = "(";
-                        for (i = 0; i < locationForFailureoutput.rows.length; i++) {
+                        if (locationForFailureoutput != null && locationForFailureoutput.rows.length > 0) {
+                            console.log("locationForFailureoutput.rows.length =>" + locationForFailureoutput.rows.length);
+                            var inOperator = "(";
+                            for (i = 0; i < locationForFailureoutput.rows.length; i++) {
 
-                            inOperator += "'" + locationForFailureoutput.rows[i].SITE_NAME + "'";
+                                inOperator += "'" + locationForFailureoutput.rows[i].SITE_NAME + "'";
 
-                            if (i < locationForFailureoutput.rows.length - 1) {
-                                inOperator += ",";
+                                if (i < locationForFailureoutput.rows.length - 1) {
+                                    inOperator += ",";
+                                }
+
+
                             }
-
+                            inOperator += ")";
+                            var locationSql = "SELECT DISTINCT LOCATION_NAME from name_repo.NMG_CHATBOT_MV WHERE CI_NAME IN " + inOperator + " and LOWER(LOCATION_NAME) != 'unknown' and LOWER(LOCATION_NAME) not like 'estimated%'";
+                            if (data.context.cxt_tech_type_region != null) {
+                                locationSql += " and LOWER(region) = '" + data.context.cxt_tech_type_region.toLowerCase() + "'";
+                            }
+                            data.context.cxt_location_list_trx_failure_query = locationSql;
+                            //console.log("data.context.cxt_location_list_trx_failure=>" + data.context.cxt_location_list_trx_failure);
 
                         }
-                        inOperator += ")";
-                        var locationSql = "SELECT LOCATION_NAME from name_repo.NMG_CHATBOT_MV WHERE CI_NAME IN " + inOperator + " and LOWER(LOCATION_NAME) != 'unknown' and LOWER(LOCATION_NAME) not like 'estimated%'";
-                        data.context.cxt_location_list_trx_failure_query = locationSql;
-                        //console.log("data.context.cxt_location_list_trx_failure=>" + data.context.cxt_location_list_trx_failure);
 
+
+                        data.output.text = orchestrateBotResponseTextForTransmissionFailures(null, data.output.text, data, sync);
+                    } else {
+                        data.output.text = "<b>Sorry, i could not connect to data source for fetching the requested information. Please try again later.</b>";
                     }
-
-
-                    data.output.text = orchestrateBotResponseTextForTransmissionFailures(null, data.output.text, data, sync);
                 }
 
             }
@@ -210,6 +234,7 @@ module.exports = function () {
 
             if (data.context.cxt_customer_drill_down_region != null) {
                 isValidCustomerIntent = true;
+                regionName = data.context.cxt_customer_drill_down_region;
             }
             if (data.context.cxt_location_list_trx_failure_query != null) {
                 isValidCustomerIntent = false;
@@ -267,24 +292,29 @@ module.exports = function () {
                 var customerPatternSql = "Select DISTINCT MPLSVPN_NAME,IFACE_VLANID from  tellabs_ods.ebu_vlan_status_mv where LOWER(MPLSVPN_NAME) like '" + data.context.cxt_user_selected_customer + "%' AND IFACE_VLANID > 0";
                 var complexPatternOutput = null;
                 var connection = getOracleDBConnection(sync);
-                complexPatternOutput = getOracleQueryResult(connection, customerPatternSql, sync);
-                doRelease(connection);
+                if (connection) {
+                    complexPatternOutput = getOracleQueryResult(connection, customerPatternSql, sync);
+                    doRelease(connection);
 
-                if (complexPatternOutput != null && complexPatternOutput.rows != null) {
+                    if (complexPatternOutput != null && complexPatternOutput.rows != null) {
 
-                    if (complexPatternOutput.rows.length == 1) {
-                        data.context.cxt_user_selected_customer = complexPatternOutput.rows[0].MPLSVPN_NAME;
-                    } else if (complexPatternOutput.rows.length > 1) {
-                        var dbMatchedCustomerList = [];
-                        for (i = 0; i < complexPatternOutput.rows.length; i++) {
-                            dbMatchedCustomerList = complexPatternOutput.rows[0].MPLSVPN_NAME;
+                        if (complexPatternOutput.rows.length == 1) {
+                            data.context.cxt_user_selected_customer = complexPatternOutput.rows[0].MPLSVPN_NAME;
+                        } else if (complexPatternOutput.rows.length > 1) {
+                            var dbMatchedCustomerList = [];
+                            for (i = 0; i < complexPatternOutput.rows.length; i++) {
+                                dbMatchedCustomerList = complexPatternOutput.rows[0].MPLSVPN_NAME;
+                            }
+                            data.context.cxt_user_selected_customer = getCorrectComplexCustomerNameFromPatternMatching(dbMatchedCustomerList);
                         }
-                        data.context.cxt_user_selected_customer = getCorrectComplexCustomerNameFromPatternMatching(dbMatchedCustomerList);
+                        // once confirmed from db it will be added into watson training so next time watson will know about this customer and will not confirm again from db.
+                        if (data.context.cxt_user_selected_customer != null) {
+                            createEntityValue(customerInputText, "complex-corporate-customers");
+                        }
                     }
-                    // once confirmed from db it will be added into watson training so next time watson will know about this customer and will not confirm again from db.
-                    if (data.context.cxt_user_selected_customer != null) {
-                        createEntityValue(customerInputText, "complex-corporate-customers");
-                    }
+                } else {
+                    // database could not be connected.
+                    data.output.text = "<b>Sorry, i could not connect to data source for fetching the requested information. Please try again later.</b>";
                 }
 
 
@@ -301,26 +331,34 @@ module.exports = function () {
 
                 var output = null;
                 var connection = getOracleDBConnection(sync);
-                output = getOracleQueryResult(connection, customerSql, sync);
-                doRelease(connection);
+                if (connection) {
 
-                if (output != null && output.rows != null) {
-                    customerCount = output.rows.length;
+                    output = getOracleQueryResult(connection, customerSql, sync);
+                    doRelease(connection);
+
+                    if (output != null && output.rows != null) {
+                        customerCount = output.rows.length;
+                    }
+
+                    data.context.cxt_customer_query = customerSql;
+                    data.context.cxt_matched_customer_count = customerCount;
+
+                    if (customerCount == 1) {
+                        data.context.cxt_user_selected_customer = output.rows[0].MPLSVPN_NAME;
+                    }
+                    data.output.text = orchestrateBotResponseTextForCustomer(customerCount, data, regionName);
+
+
+                } else {
+                    data.output.text = "<b>Sorry, i could not connect to data source for fetching the requested information. Please try again later.</b>";
                 }
 
-                data.context.cxt_customer_query = customerSql;
-                data.context.cxt_matched_customer_count = customerCount;
-
-                if (customerCount == 1) {
-                    data.context.cxt_user_selected_customer = output.rows[0].MPLSVPN_NAME;
-                }
-                data.output.text = orchestrateBotResponseTextForCustomer(customerCount, data, regionName);
             }
 
 
         }
 
-        if (data != null && data.intents[0].intent == 'corporate-customer' && data.intents[0].confidence < 0.5 && customerCount == 0) {
+        if (data != null && data.intents!=null && data.intents[0].intent == 'corporate-customer' && data.intents[0].confidence < 0.5 && customerCount == 0) {
             // this code is written to handle the shit of Watson API that will not hit any intent in developer interface but when returned
             // in orchestration layer it shows corporate customer intent for unknown input with confidence less than 0.5 not sure why just applying a check to 
             // handle the scenario
@@ -347,31 +385,39 @@ module.exports = function () {
             console.log("unknown customer sql =>" + sql);
 
             var connection = getOracleDBConnection(sync);
+            if (connection) {
 
-            output = getOracleQueryResult(connection, sql, sync);
+                output = getOracleQueryResult(connection, sql, sync);
 
-            doRelease(connection);
+                doRelease(connection);
 
-            if (output != null && output.rows != null && output.rows.length > 0) {
+                if (output != null && output.rows != null && output.rows.length > 0) {
 
-                // add learning code here.
-                if (customerInputText != null) {
-                    // Adding to watson training.
-                    customerInputText = S(customerInputText).replaceAll('%', ' ').s; // replacing % with space for like query
-                    console.log("Adding entity=>" + customerInputText);
-                    createEntityValue(customerInputText, "corporate-customers");
+                    // add learning code here.
+                    if (customerInputText != null) {
+                        // Adding to watson training.
+                        customerInputText = S(customerInputText).replaceAll('%', ' ').s; // replacing % with space for like query
+                        console.log("Adding entity=>" + customerInputText);
+                        createEntityValue(customerInputText, "corporate-customers");
+                    }
+                    customerCount = output.rows.length;
                 }
-                customerCount = output.rows.length;
-            }
-            data.context.cxt_customer_query = sql;
-            if (customerCount == 1) {
-                // data.context.cxt_user_selected_customer = S(output.rows[0].MPLSVPN_NAME).replaceAll('/', '#').s;
-                data.context.cxt_user_selected_customer = output.rows[0].MPLSVPN_NAME;
+                data.context.cxt_customer_query = sql;
+                if (customerCount == 1) {
+                    // data.context.cxt_user_selected_customer = S(output.rows[0].MPLSVPN_NAME).replaceAll('/', '#').s;
+                    data.context.cxt_user_selected_customer = output.rows[0].MPLSVPN_NAME;
+
+                }
+                data.context.cxt_matched_customer_count = customerCount;
+                data.output.text = orchestrateBotResponseTextForCustomer(customerCount, data, regionName);
+                data.context.cxt_customer_input_text = null;
+
+            } else {
+                data.output.text = "<b>Sorry, i could not connect to data source for fetching the requested information. Please try again later.</b>";
+
 
             }
-            data.context.cxt_matched_customer_count = customerCount;
-            data.output.text = orchestrateBotResponseTextForCustomer(customerCount, data, regionName);
-            data.context.cxt_customer_input_text = null;
+
         }
         // handling regiona and customer name case
 
@@ -400,15 +446,21 @@ module.exports = function () {
             for (i = 0; i < data.entities.length; i++) {
                 if (data.entities[i].entity == 'escalation' || data.entities[i].entity == "2g-sites") {
                     isValidRegionIntentCase = false;
+                    break;
                 }
                 if (data.entities[i].entity == "complex-customers-patterns" || data.entities[i].entity == "complex-corporate-customers" || data.entities[i].entity == "corporate-customers") {
                     isValidRegionIntentCase = false;
+                    break;
                 }
                 if (data.entities[i].entity == 'regions' || data.entities[i].entity == "sys-location") {
                     regionName = data.entities[i].value;
                     isValidRegionIntentCase = true;
                 } else {
                     isValidRegionIntentCase = false;
+                }
+                if (data.entities[i].entity == "transmission-failures") {
+                    isValidRegionIntentCase = false;
+                    break;
                 }
 
             }
@@ -445,10 +497,7 @@ module.exports = function () {
                 regionName = lookupResult.data.rows[0].full_name;
             }
             data.context.cxt_region_full_name = regionName;
-            /* var regionName_2 = S(regionName).replaceAll('Africa', "").s;
-             regionName_2 = S(regionName_2).replaceAll('africa', "").s;
-             regionName_2 = S(regionName_2).s; */
-             data.output.text = orchestrateBotResponseTextForRegion(null, data.output.text, regionName, data, sync);
+            data.output.text = orchestrateBotResponseTextForRegion(null, data.output.text, regionName, data, sync);
         }
 
         return data.output.text;
@@ -513,36 +562,63 @@ module.exports = function () {
             if (incidentNumber) {
                 var incident_no_str = incidentNumber.toUpperCase();
                 incidentNumber = correctIncidentNumberFormat(incident_no_str);
-                var sql = "SELECT * from (SELECT " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and tas.status != '6000' and inc.INCIDENT_NUMBER  = '" + incidentNumber + "') A left join"+
-                          "(SELECT * FROM (SELECT incident_number, DETAILED_DESCRIPTION, work_log_type, TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (WORK_LOG_DATE + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as WORK_LOG_DATE FROM ARADMIN.HPD_WORKLOG where incident_number = '" + incidentNumber + "' ORDER BY work_log_date desc) WHERE rownum = 1) B on A.incident_number = B.incident_number";
-             
+                var sql = "SELECT " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and inc.INCIDENT_NUMBER  = '" + incidentNumber + "'";
+                //"(SELECT * FROM (SELECT incident_number, DETAILED_DESCRIPTION, work_log_type, TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (WORK_LOG_DATE + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as WORK_LOG_DATE FROM ARADMIN.HPD_WORKLOG where incident_number = '" + incidentNumber + "' ORDER BY work_log_date desc) WHERE rownum = 1) B on A.incident_number = B.incident_number";
+
                 console.log("Inciddent SQL=>" + sql);
                 var connection = getOracleDBConnectionRemedy(sync);
-                var output = getOracleQueryResult(connection, sql, sync);
-                console.log("output.rows.length=>"+JSON.stringify(output.rows.length));
-                doRelease(connection);
-                if (output != null && output.rows != null && output.rows.length > 0) {
-                    console.log("found incident");
-                    var childsql = "Select count(*) as CHILD_COUNT from " + incidentTableName + " where inc.STATUS in (0,1,2,3)  and inc.ORIGINAL_INCIDENT_NUMBER  = '" + incidentNumber + "'";
-                    console.log("child incident count query =>" + childsql);
-                    var connection = getOracleDBConnectionRemedy(sync);
-                    var childoutput = getOracleQueryResult(connection, childsql, sync);
-                    doRelease(connection);
-                    var childCount = 0;
-                    if (childoutput != null && childoutput.rows != null) {
-                        console.log("child count for incident =>" + childoutput.rows[0].CHILD_COUNT);
-                        childCount = childoutput.rows[0].CHILD_COUNT;
+                if (connection) {
+
+                    var output = getOracleQueryResult(connection, sql, sync);
+                    console.log("output.rows.length=>" + JSON.stringify(output.rows.length));
+                    console.log("output.rows=>" + JSON.stringify(output.rows));
+                    if (output!=null  && output.rows!=null && output.rows.length>0 && output.rows[0].RELATIONSHIP_TYPE != "Child") {
+                        console.log("incident is not child incident");
+                        var sql = "SELECT * from (SELECT " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and tas.status != '6000' and inc.INCIDENT_NUMBER  = '" + incidentNumber + "') A left join" +
+                            "(SELECT * FROM (SELECT incident_number, DETAILED_DESCRIPTION, work_log_type, TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (WORK_LOG_DATE + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as WORK_LOG_DATE FROM ARADMIN.HPD_WORKLOG where incident_number = '" + incidentNumber + "' ORDER BY work_log_date desc) WHERE rownum = 1) B on A.incident_number = B.incident_number";
+                        output = getOracleQueryResult(connection, sql, sync);
+                        if (output.rows.length == 0) {
+                            var sql = "SELECT " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and inc.INCIDENT_NUMBER  = '" + incidentNumber + "'";
+                            // "(SELECT * FROM (SELECT incident_number, DETAILED_DESCRIPTION, work_log_type, TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (WORK_LOG_DATE + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as WORK_LOG_DATE FROM ARADMIN.HPD_WORKLOG where incident_number = '" + incidentNumber + "' ORDER BY work_log_date desc) WHERE rownum = 1) B on A.incident_number = B.incident_number";
+                            output = getOracleQueryResult(connection, sql, sync);
+                        }
+                    } else {
+                        console.log("incident is child incident");
+                        var sql = "SELECT " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and inc.INCIDENT_NUMBER  = '" + incidentNumber + "'";
+                        // "(SELECT * FROM (SELECT incident_number, DETAILED_DESCRIPTION, work_log_type, TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (WORK_LOG_DATE + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as WORK_LOG_DATE FROM ARADMIN.HPD_WORKLOG where incident_number = '" + incidentNumber + "' ORDER BY work_log_date desc) WHERE rownum = 1) B on A.incident_number = B.incident_number";
+                        output = getOracleQueryResult(connection, sql, sync);
+
                     }
-                    data.output.text = orchestrateBotResponseTextForIncident(output.rows, data.output.text, data, childCount);
-                    
+
+                    doRelease(connection);
+                    if (output != null && output.rows != null && output.rows.length > 0) {
+                        console.log("found incident");
+                        var childsql = "Select count(*) as CHILD_COUNT from " + incidentTableName + " where inc.STATUS in (0,1,2,3)  and inc.ORIGINAL_INCIDENT_NUMBER  = '" + incidentNumber + "' and inc.INCIDENT_ASSOCIATION_TYPE = 1";
+                        console.log("child incident count query =>" + childsql);
+                        var connection = getOracleDBConnectionRemedy(sync);
+                        var childoutput = getOracleQueryResult(connection, childsql, sync);
+                        doRelease(connection);
+                        var childCount = 0;
+                        if (childoutput != null && childoutput.rows != null) {
+                            console.log("child count for incident =>" + childoutput.rows[0].CHILD_COUNT);
+                            childCount = childoutput.rows[0].CHILD_COUNT;
+                        }
+                        data.output.text = orchestrateBotResponseTextForIncident(output.rows, data.output.text, data, childCount);
+
+                    } else {
+
+                        //data = resetIncidentContext(data);
+                        data = resetEveryThing(data);
+                        data.output.text = "<b>Sorry, no result can be found against given incident number " + incidentNumber + " in remedy. Please provide with a different incident number.</b>";
+
+
+                    }
+
                 } else {
-                    
-                    //data = resetIncidentContext(data);
-                    data = resetEveryThing(data);
-                    data.output.text = "<b>Sorry, no result can be found against given incident number " + incidentNumber + " in remedy. Please provide with a different incident number.</b>";
-                    
-                    
+                    data.output.text = "<b>Sorry, i could not connect to data source for fetching the requested information. Please try again later.</b>";
+
                 }
+
             } else {
 
                 data.output.text = "Yes sure, please provide me with the incident number.";

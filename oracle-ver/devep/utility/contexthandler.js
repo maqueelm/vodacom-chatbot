@@ -29,17 +29,18 @@ module.exports = function () {
     this.showChildIncidentsWithContext = function (response, sync,conversationId) {
         if (response != null && response.context.cxt_show_incident_details != null && response.context.cxt_show_incident_details == true && response.context.cxt_incident_number != null && response.context.cxt_incident_number != -1 && response.context.cxt_is_master_incident != null && response.context.cxt_is_master_incident) {
 
-            var childsql = "Select " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and inc.ORIGINAL_INCIDENT_NUMBER  = '" + correctIncidentNumberFormat(response.context.cxt_incident_number) + "'";
+            //var childsql = "Select " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and inc.ORIGINAL_INCIDENT_NUMBER  = '" + correctIncidentNumberFormat(response.context.cxt_incident_number) + "'";
+            var childsql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and inc.ORIGINAL_INCIDENT_NUMBER  = '" + correctIncidentNumberFormat(response.context.cxt_incident_number) + "'";
             console.log("query from context variable =>" + childsql);
             //var childoutput = executeQuerySync(childsql);
             var connection = getOracleDBConnectionRemedy(sync);
             var childoutput = getOracleQueryResult(connection, childsql, sync);
             doRelease(connection);
             var outputText = '';
-            outputText = showChildIncidents(childoutput.rows, outputText, response, conversationId);
-            if (response.output!= null) {
+            response = showChildIncidents(childoutput.rows, outputText, response, conversationId);
+           /* if (response.output!= null) {
                 response.output.text = outputText;
-            }
+            }*/
             response = resetEveryThing(response);
 
         }
@@ -55,7 +56,20 @@ module.exports = function () {
             var connection = getOracleDBConnectionRemedy(sync);
             var childoutput = getOracleQueryResult(connection, childsql, sync);
             doRelease(connection);
-            response.ouput.text = showParentIncidentDetails(childoutput.rows, response.ouput.text, response);
+            var outputText = '';
+            console.log("childoutput.rows.length=>"+childoutput.rows.length);
+            if (childoutput.rows.length == 0) {
+               
+                var sql = "SELECT " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and inc.INCIDENT_NUMBER  = '" + correctIncidentNumberFormat(response.context.cxt_parent_incident_number) + "'";
+                // "(SELECT * FROM (SELECT incident_number, DETAILED_DESCRIPTION, work_log_type, TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (WORK_LOG_DATE + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as WORK_LOG_DATE FROM ARADMIN.HPD_WORKLOG where incident_number = '" + incidentNumber + "' ORDER BY work_log_date desc) WHERE rownum = 1) B on A.incident_number = B.incident_number";
+                console.log("query without task=>"+sql);
+                var connection = getOracleDBConnectionRemedy(sync);
+                childoutput = getOracleQueryResult(connection, sql, sync);
+                console.log("childoutput.rows.length=>"+childoutput.rows.length);
+                doRelease(connection);
+            } 
+           
+            response = showParentIncidentDetails(childoutput.rows, outputText, response);
             response = resetEveryThing(response);
 
         }
@@ -65,7 +79,7 @@ module.exports = function () {
     this.showMasterIncidentForRegionWithContext = function (response, sync, conversationId) {
 
         // intent 2 :: Master Incident
-        var outputText = '';
+        var outputText = [];
         if (response != null && response.context.cxt_region_show_master_incident) {
             
             console.log("response.context.cxt_region_name =>" + response.context.cxt_region_name);
@@ -77,8 +91,6 @@ module.exports = function () {
             } else {
                 customerRegion = response.context.cxt_region_name;
             }
-
-
 
             console.log("response.context.cxt_child_incident_count_for_region=>" + response.context.cxt_child_incident_count_for_region);
             // if no master found with child association list all masters that are found for the region.
@@ -135,17 +147,19 @@ module.exports = function () {
                 if (listOfSitesOutput != null && listOfSitesOutput.rows.length > 0) {
                     
                     outputText = "<b>Do you know the site or node name. Common names in " + response.context.cxt_region_full_name + " are </b> <br/>";
+                    outputText += "<table><tr><td><ul>";
                     for (i = 0; i < listOfSitesOutput.rows.length; i++) {
                         
                         if (i > 0 && i % 4 == 0) {
-                            outputText += "<br/>";
+                            outputText += "</ul></td><td><ul>";
                         }
-                        outputText += "<a href='#' id='site-flow-" + i + "' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + listOfSitesOutput.rows[i].SITE_NAME + "</a>";
-                        if (i < listOfSitesOutput.rows.length - 1)
-                        outputText += ",&nbsp;";
+                        outputText += "<li><a href='#' id='site-flow-" + i + "' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + listOfSitesOutput.rows[i].SITE_NAME + "</a></li>";
+                       // if (i < listOfSitesOutput.rows.length - 1)
+                       // outputText += ",&nbsp;";
 
 
                     }
+                    outputText += "</ul></td></tr></td></table>";
 
                     outputText += "<br/><br/> <b>If you do not know the site or node name select <a href='#' id='no' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >No</a> to search based on Location</b>";
                 }
@@ -185,10 +199,10 @@ module.exports = function () {
                     var listOfSitesOutput = getOracleQueryResult(connection, incidentSql, sync);
                     doRelease(connection);
                     if (listOfSitesOutput != null && listOfSitesOutput.rows != null) {
-                        response.ouput.text = showIncidentsForSiteName(listOfSitesOutput.rows, response.ouput.text, response, conversationId); // this method is used for displaying incident information
+                        outputText = showIncidentsForSiteName(listOfSitesOutput.rows, outputText, response, conversationId); // this method is used for displaying incident information
                     } else {
                         listOfSitesOutput = {};
-                        response.ouput.text = showIncidentsForSiteName(listOfSitesOutput, response.ouput.text, response, conversationId);
+                        outputText = showIncidentsForSiteName(listOfSitesOutput, outputText, response, conversationId);
                     }
                     response.context.cxt_site_name_region_flow_found = false;
                     response.context.cxt_site_name_region_flow = null;
@@ -227,14 +241,14 @@ module.exports = function () {
 
 
             if (response.context.cxt_site_name_region_flow_found && response.context.cxt_site_name_region_flow != null) {
-                outputText = "Site name found do you want to see its incidents, reply with <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a>.";
+                outputText = "<b>Site name found do you want to see its incidents, reply with <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a></b>.";
                 response.context.cxt_site_name_region_flow_found = true;
                 response.context.cxt_site_name_region_show_incident_detail = true;
 
 
             }
             if (!response.context.cxt_site_name_region_flow_found && !response.context.cxt_site_name_region_show_incident_detail && !response.context.cxt_region_flow_search_for_location) {
-                outputText = "Site name <b>not</b> found do you want to search with location? reply with <b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a></b>.";
+                outputText = "<b>Site name <b>not</b> found do you want to search with location? reply with <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>yes</a></b>.";
                 response.context.cxt_region_flow_search_for_location = true;
                 response.context.cxt_site_name_region_flow = null;
             }
@@ -281,9 +295,10 @@ module.exports = function () {
                 doRelease(connection);
         
                 outputText = showIncidentsForRegionBasedOnLocation(incidentOutput.rows, outputText, response, conversationId);
+                response = resetEveryThing(response);
             } else {
 
-                outputText = "Sorry the entered location is <b>not</b> found. <br/><br/>" + response.output.text[0];
+                outputText = "<b>Sorry the entered location is not< found./b><br/>";// + response.output.text[0];
             }
 
             
@@ -559,11 +574,12 @@ module.exports = function () {
             //outputText += response.output.text[response.output.text.length - 1]; // what else i can do for you message.
             //response.output.text = outputText;
             if (response.output.text[0] != null) {
-                outputText += response.output.text[0]; // what else i can do for you message.
-                response.output.text = outputText;
+                var temp = response.output.text[0]; // what else i can do for you message.
+                response.output.text[0] = outputText;
+                response.output.text[1] = temp;
             } else {
-                outputText += response.output.text[1]; // what else i can do for you message.
-                response.output.text = outputText;
+                //outputText += response.output.text[1]; // what else i can do for you message.
+                response.output.text[0] = outputText;
             }
 
             // put this reset variable here for fixing an issue related to corporate customer. will check and decide accordingly.
@@ -607,11 +623,13 @@ module.exports = function () {
 
                 } else {
                     console.log("credentials not verified");
-                    //if ()
-                    response.ouput.text = response.output.text[0];
+                   /* if (response.output != null && response.output.text[0] != null){
+                        var outputText = response.output.text[0];
+                        response.output.text = outputText;
+                    }
                     if (response.output.text[1] != null) {
                         response.ouput.text += response.output.text[1];
-                    }
+                    }*/
                     //console.log(response.ouput.text);
                     response.context.cxt_user_email = null;
                     response.context.cxt_user_password = null;
