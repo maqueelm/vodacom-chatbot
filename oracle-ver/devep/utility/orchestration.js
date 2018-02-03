@@ -1,4 +1,11 @@
 module.exports = function () {
+	var workspaceId = process.env.WORKSPACE_ID;
+    var Conversation = require("watson-developer-cloud/conversation/v1");
+    var conversation = new Conversation({
+        username: process.env.CONVERSATION_USERNAME,
+        password: process.env.CONVERSATION_PASSWORD,
+        version_date: '2017-05-26'
+    });
 	var excelbuilder = require('msexcel-builder');
 	var S = require('string');
 	require('./stringhandler')();
@@ -65,7 +72,7 @@ module.exports = function () {
 		var outputText_new = '';
 		if (dbQueryResult.length > 0) {
 			outputText_new = "Please see details below for Master incident <b>" + dbQueryResult[0].INCIDENT_NUMBER + "</b>.<br/><br/>";
-			outputText_new += "This incident was logged for <b><i>[site_name]</i></b> in the <b><i>[region]</i></b>.<br/>The status is <b><i>[status]</i></b>, impact is set to <b><i>[impact]</i></b> and it has been assigned to the <b><i>[assigned_to]</i></b>.<br/>        <b>Incident Summary :</b> [incident_summary]<br/><b>Task Assignee group :</b> [task_assignee_group]<br><b>Task Assignee :</b> [task_assignee]";
+			outputText_new += "This incident was logged for <b><i>[site_name]</i></b>.<br/>The status is <b><i>[status]</i></b> and it has been assigned to the <b><i>[assigned_to]</i></b>.<br/> <b>Incident Summary :</b> [incident_summary]<br/><b>Incident Event Start Time :</b>[incident_event_start_time]<br/><b>Task Assignee group :</b> [task_assignee_group]<br><b>Task Assignee :</b> [task_assignee]<br><b>Task Last Update Date :</b> [WORK_LOG_DATE]<br><b>Task Description :</b> [DETAILED_DESCRIPTION]";
 
 			outputText_new = S(outputText_new).replaceAll('[impact]', dbQueryResult[0].IMPACT).s;
 			outputText_new = S(outputText_new).replaceAll('[region]', dbQueryResult[0].REGION).s;
@@ -75,7 +82,29 @@ module.exports = function () {
 			outputText_new = S(outputText_new).replaceAll('[incident_summary]', dbQueryResult[0].SUMMARY).s;
 			outputText_new = S(outputText_new).replaceAll('[task_assignee_group]', dbQueryResult[0].TASK_ASSIGNEE_GROUP).s;
 			outputText_new = S(outputText_new).replaceAll('[task_assignee]', dbQueryResult[0].TASK_ASSIGNEE).s;
-			outputText_new += "<br/><b>Incident Event Start:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_START_TIME + "</i>";
+			outputText_new = S(outputText_new).replaceAll('[incident_event_start_time]', dbQueryResult[0].INCIDENT_EVENT_START_TIME).s;
+			if (dbQueryResult[0].TASK_ASSIGNEE_GROUP) {
+				outputText_new = S(outputText_new).replaceAll('[task_assignee_group]', dbQueryResult[0].TASK_ASSIGNEE_GROUP).s;
+			} else {
+				outputText_new = S(outputText_new).replaceAll('[task_assignee_group]', null).s;
+			}
+			if (dbQueryResult[0].TASK_ASSIGNEE) {
+				outputText_new = S(outputText_new).replaceAll('[task_assignee]', dbQueryResult[0].TASK_ASSIGNEE).s;
+			} else {
+				outputText_new = S(outputText_new).replaceAll('[task_assignee]', null).s;
+			}
+
+			if (dbQueryResult[0].DETAILED_DESCRIPTION) {
+				outputText_new = S(outputText_new).replaceAll('[DETAILED_DESCRIPTION]', dbQueryResult[0].DETAILED_DESCRIPTION).s;
+			} else {
+				outputText_new = S(outputText_new).replaceAll('[DETAILED_DESCRIPTION]', null).s;
+			}
+
+			if (dbQueryResult[0].WORK_LOG_DATE) {
+				outputText_new = S(outputText_new).replaceAll('[WORK_LOG_DATE]', dbQueryResult[0].WORK_LOG_DATE).s;
+			} else {
+				outputText_new = S(outputText_new).replaceAll('[WORK_LOG_DATE]', null).s;
+			}
 			if (dbQueryResult[0].INC_STATUS.toLowerCase() == 'closed') {
 				outputText_new += "<b>Incident Event Closed:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_END_TIME + "</i>.";
 				outputText_new += "<br/><b>Cause: </b>" + dbQueryResult[0].cause_tier_3 + "<br/> <b>Resolution: </b>" + dbQueryResult[0].RESOLUTION_CATEGORY_TIER_3 + "";
@@ -89,7 +118,15 @@ module.exports = function () {
 		//console.log("response.output.text[1]"+response.output.text[1]);
 		outputText = outputText_new;// + data.output.text[1];// += response.output.text[1];// += outputText_new;"<br/><br/>"+ data.output.text[1];
 		outputText = addFeedbackButton(outputText);
-		response.output.text[0] = outputText;
+		if (response.output.text[0] != null) {
+			var temp = response.output.text[0];
+			response.output.text[0] = outputText;
+			response.output.text[1] = temp;
+
+		} else {
+			response.output.text[0] = outputText;
+		}
+		
 		return response;
 
 	}
@@ -120,18 +157,21 @@ module.exports = function () {
 		outputText = outputText_new;
 		outputText = addFeedbackButton(outputText);
 
-		/*if (data.output.text[1] != null) {
-			outputText = outputText_new + data.output.text[1];
+		if (response.output.text[0] != null) {
+			var temp = response.output.text[0];
+			response.output.text[0] = outputText;
+			response.output.text[1] = temp;
+
 		} else {
 			outputText = outputText_new;
-		}*/
+		}
 
-		response.output.text[0] = outputText;
+		//response.output.text[0] = outputText;
 
 		return response;
 	}
 
-	this.orchestrateBotResponseTextForIncident = function (dbQueryResult, outputText, response, childCount) {
+	this.orchestrateBotResponseTextForIncident = function (dbQueryResult, outputText, response, childCount,sync) {
 		console.log("orchestrateBotResponseTextForIncident = >Length of rows =>" + dbQueryResult.length);
 		//console.log ("dbQueryResult =>" + JSON.stringify(dbQueryResult));
 		if (dbQueryResult != null && dbQueryResult.length == 0) {
@@ -188,12 +228,19 @@ module.exports = function () {
 				outputText += "<br/> I also found that  <b>" + dbQueryResult[0].INCIDENT_NUMBER + "</b> is a <b>" + dbQueryResult[0].RELATIONSHIP_TYPE + "</b> incident ";
 				if (childCount > 0) {
 					outputText += "and it has <b>" + child_incident_count + "</b> open child incidents, if you like to see these incidents detail, reply with <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >Yes</a>&nbsp;<a href='#' id='no' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >No</a>.";
+					outputText = addFeedbackButton(outputText);
 					response.output.text[0] = outputText;
 				} else {
 					response.context.cxt_incident_number = -1;
-					outputText += "and it does not have any open child incidents.<br/><b>Please click <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >Yes</a> to ask something else.</b>";
-					
-					response.output.text[0] = outputText;
+
+					response = resetEveryThing(response);
+					response = getWatsonResponse(response,sync);
+					var temp = response.output.text[0];
+					outputText += "and it does not have any open child incidents.";
+					outputText = addFeedbackButton(outputText);
+                    response.output.text[0] = outputText;
+                    response.output.text[1] = temp;
+					//response.output.text[0] = outputText;
 					//response.output.text[1] = "";
 					outputText = response.output.text;
 					
@@ -201,10 +248,11 @@ module.exports = function () {
 			} else {
 				response.context.cxt_is_master_incident = false;
 				response.context.cxt_parent_incident_number = dbQueryResult[0].PARENT_INCIDENT_NUMBER;
-				outputText += "<br/> I found that " + dbQueryResult[0].INCIDENT_NUMBER + " is " + dbQueryResult[0].RELATIONSHIP_TYPE + " of " + dbQueryResult[0].PARENT_INCIDENT_NUMBER + ". If you like to see the detail of master incident, reply with <b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >yes</a>&nbsp;<a href='#' id='no' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >No</a></b>.";
+				outputText += "<br/> <b>I found that " + dbQueryResult[0].INCIDENT_NUMBER + " is " + dbQueryResult[0].RELATIONSHIP_TYPE + " of " + dbQueryResult[0].PARENT_INCIDENT_NUMBER + ". If you like to see the detail of master incident, reply with <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >yes</a>&nbsp;<a href='#' id='no' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >No</a></b>.";
+				outputText = addFeedbackButton(outputText);
 				response.output.text[0] = outputText;
 			}
-			outputText = addFeedbackButton(outputText);
+			
 
 
 
@@ -290,7 +338,8 @@ module.exports = function () {
 			var columnCount = 0;
 			for (i = 0; i < locationList.rows.length; i++) {
 				locationsText += "<li>";
-				locationsText += "<a href='#' id='location_" + i + "' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + locationList.rows[i].LOCATION_NAME + "</a>";
+				var locationId= S(locationList.rows[i].LOCATION_NAME).replaceAll(' ', '').s;
+				locationsText += "<a href='#' id='" +locationId + "' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + locationList.rows[i].LOCATION_NAME + "</a>";
 				locationsText += "</li>";
 				if (i > 0 && i % 3 == 0) {
 					locationsText += "</ul></td><td><ul>";
@@ -698,6 +747,35 @@ module.exports = function () {
 
 
 	}
+
+	function getWatsonResponse(data,sync) {
+        var conversation = new Conversation({
+            // If unspecified here, the CONVERSATION_USERNAME and CONVERSATION_PASSWORD env properties will be checked
+            // After that, the SDK will fall back to the bluemix-provided VCAP_SERVICES environment property
+            username: process.env.CONVERSATION_USERNAME,
+            password: process.env.CONVERSATION_PASSWORD,
+            url: 'https://gateway.watsonplatform.net/conversation/api',
+            version_date: '2016-10-21',
+            version: 'v1'
+        });
+        var payload = {
+            workspace_id: process.env.WORKSPACE_ID,
+            context: data.context || {},
+            input: {}
+        };
+        // Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
+        var response = null;
+        try {
+            response = sync.await(conversation.message(payload, sync.defer()));
+    
+        } catch (err) {
+            //TODO Handle error
+            console.log("error=>" + JSON.stringify(err.message));
+        }
+        return response;
+    
+    
+    }
 
 
 

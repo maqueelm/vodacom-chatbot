@@ -377,14 +377,14 @@ module.exports = function () {
         } else {
             // update location message for Transmission failure here.	
         }
-        console.log("response.output.text=>"+response.output.text);
+        //console.log("response.output.text=>"+response.output.text);
         return response;
 
     }
 
     this.corporateCustomerFlowWithContext = function (response, sync) {
 
-        if (response!= null && response.context.cxt_matched_customer_count > 1 && response.entities != null && response.entities[0].entity == 'yes' && response.context.cxt_customer_drill_down_region == null) {
+        if (response!= null && response.context.cxt_matched_customer_count > 1 && response.entities != null && response.entities[0] !=null && response.entities[0].entity == 'yes' && response.context.cxt_customer_drill_down_region == null) {
             var outputText = response.output.text[0];
             var sql = response.context.cxt_customer_region_list_query;
             var connection = getOracleDBConnection(sync);
@@ -607,7 +607,7 @@ module.exports = function () {
 
     this.userLoginWithContext = function (response) {
 
-        if (response != null && !response.context.cxt_user_logged_in && response.context.cxt_verify_user) {
+        if (response != null && response.context != null && !response.context.cxt_user_logged_in && response.context.cxt_verify_user) {
             console.log("verifying user credentials");
 
             if (response.context.cxt_user_email != null && response.context.cxt_user_password != null) {

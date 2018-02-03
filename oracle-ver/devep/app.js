@@ -36,6 +36,7 @@ var lastUsedIntent = null;
 var lastUsedEntity = null;
 var userFullName = null;
 var lastOutputText = null;
+var lastResponse = null;
 var oracleConnectionString = {
 	user: dbConfig.user,
 	password: dbConfig.password,
@@ -105,12 +106,21 @@ app.post('/api/message', function (req, res) {
 	try {
 
 		fiber(function () {
+
 			
 
-			conversationId = payload.context.conversation_id;
-			response = getWatsonResponse(payload, sync);
+			response = getWatsonResponse(payload);
+			if (conversationId == null) {
+				conversationId = response.context.conversation_id;
+			}
+
+			if (conversationId != response.context.conversation_id) {
+				console.log("Conversation has been reset new conversation Id now =>" + response.context.conversation_id);
+				console.log("Conversation has been reset old conversation Id now =>" + conversationId);
+				response.context.conversation_id = conversationId;
+			}
 			console.log(JSON.stringify(response));
-			if (response != null) {
+			if (response != null && response.context != null) {
 				response = startOverConversationWithContext(response);
 
 				response = showChildIncidentsWithContext(response, sync, conversationId);
@@ -124,37 +134,50 @@ app.post('/api/message', function (req, res) {
 				response = technologyTypeFlowWithContext(response, sync, conversationId);
 
 				response = corporateCustomerFlowWithContext(response, sync);
+			} else {
+				console.log("Context is null");
 			}
 			//console.log("response =>" + JSON.stringify(response));
 
-			if (response != null && response.context.cxt_user_logged_in) {
+			if (response != null && response.context != null && response.context.cxt_user_logged_in) {
 
 				console.log("user is logged in now checking intent");
 				/* SITES intent and context variable code */
-				response.output.text = handleSitesIntent(response, inputText, response.output.text, sync);
+				if (response != null && response.intents != null && response.intents.length != 0)
+					response.output.text = handleSitesIntent(response, inputText, response.output.text, sync);
 
 				/*Incident Intent Handling.*/
-				response.output.text = handleIncidentIntent(response, inputText, incidentFlow, sync);
+				if (response != null && response.intents != null && response.intents.length != 0)
+					var data = handleIncidentIntent(response, inputText, incidentFlow, sync);
+				if (data != null && data.output != null) {
+					response.output.text = data.output.text;
+				}
 
+				response = data;
 
 				/*Corporate Customer Intent handling.*/
-				response.output.text = handleCustomerIntent(response, inputText, response.output.text, incidentFlow, sync);
+				if (response != null && response.intents != null && response.intents.length != 0)
+					response.output.text = handleCustomerIntent(response, inputText, response.output.text, incidentFlow, sync);
 
 				/*Region Intent Handling.*/
-				response.output.text = handleRegionIntent(response, inputText, response.output.text, sync);
+				if (response != null && response.intents != null && response.intents.length != 0)
+					response.output.text = handleRegionIntent(response, inputText, response.output.text, sync);
 
 				/*
 					transmission failure Intent handling.
 				*/
-				response.output.text = handleTransmissionFailureIntent(response, inputText, response.output.text, sync);
+				if (response != null && response.intents != null && response.intents.length != 0)
+					response.output.text = handleTransmissionFailureIntent(response, inputText, response.output.text, sync);
 				/*
 				Escalation Intent Handling.
 				*/
-				response.output.text = handleEscalationIntent(response, inputText, response.output.text, await, defer, discovery);
+				if (response != null && response.intents != null && response.intents.length != 0)
+					response.output.text = handleEscalationIntent(response, inputText, response.output.text, await, defer, discovery);
 
 
-				console.log("response.context.cxt_location_list_trx_failure_query =>" + response.context.cxt_location_list_trx_failure_query);
-				if (response != null && response.output.text[0] != null && response.context.cxt_location_list_trx_failure_query != null && response.context.cxt_location_name_trx_flow == null) {
+
+				if (response != null && response.output != null && response.output.text[0] != null && response.context != null && response.context.cxt_location_list_trx_failure_query != null && response.context.cxt_location_name_trx_flow == null) {
+					console.log("response.context.cxt_location_list_trx_failure_query =>" + response.context.cxt_location_list_trx_failure_query);
 					console.log("replacing location name in message if there are any.");
 					response.output.text[0] = updateSuggestedLocationsInMessage(response.output.text[0], response.context.cxt_location_list_trx_failure_query, sync);
 				}
@@ -179,13 +202,13 @@ app.post('/api/message', function (req, res) {
 	}
 });
 
-function sendMessageToWatson(app,request,sync) {
+function sendMessageToWatson(app, request, sync) {
 
-	var res = sync.await(app.post('/api/message',request, sync.defer()));
+	var res = sync.await(app.post('/api/message', request, sync.defer()));
 	return res;
 }
-
-function getWatsonResponse(payload, sync) {
+// Send the input to the conversation service
+function getWatsonResponse(payload) {
 
 	// Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
 	var response = null;
@@ -200,10 +223,6 @@ function getWatsonResponse(payload, sync) {
 
 
 }
-
-
-
-
 
 var http = require('http'),
 	url = require('url'),
@@ -220,10 +239,10 @@ app.get('/feedbackOptions', function (req, res) {
 	//console.log(query.reason);
 	var feedbackReason = query.reason;
 	var feedbackReasonText = query.reasonText;
-	if (feedbackReason && all_output) {
+	if (feedbackReason && response) {
 		//console.log(all_output);
 		var feedback_value = -1; // -1 is for thumbs down
-		recordFeedback(all_output, feedbackReason, feedback_value, feedbackReasonText,0);
+		recordFeedback(response, feedbackReason, feedback_value, feedbackReasonText, 0);
 	}
 })
 
@@ -240,94 +259,58 @@ app.get('/feedback', function (req, res) {
 	//console.log(save_data + "=" + parseInt(feedback_value));
 
 	if (save_data && all_output) {
-		recordFeedback(all_output, null, feedback_value);
+		recordFeedback(all_output, null, feedback_value,null,0);
 	}
 })
 
 app.get('/rating', function (req, res) {
 	var query = url.parse(req.url, true).query;
 	var ratingValue = query.ratingVal;
-	
+
 	if (ratingValue > 0) {
 		console.log("ratingValue =>" + JSON.stringify(ratingValue));
-		var recordInserted = recordFeedback(all_output, null, 1, null,ratingValue);
+		var recordInserted = recordFeedback(all_output, null, 1, null, ratingValue);
 		if (recordInserted) {
 			res.send('1');
 		}
-		
+
 	}
-	
+
 	/*if (save_data && all_output) {
 		recordFeedback(all_output, null, feedback_value);
 	}*/
 })
 
-function recordFeedback(all_output, feedbackReason, feedback_value, feedbackReasonText,ratingValue) {
-	console.log("feedbackReason =>" + JSON.stringify(feedbackReason));
-	var input_text = all_output.input.text;
-	if (input_text) {
-		input_text = input_text;
-	} else {
-		input_text = "";
+function recordFeedback(response, feedbackReason, feedback_value, feedbackReasonText, ratingValue) {
+	console.log("recordFeedback=>feedbackReason =>" + JSON.stringify(feedbackReason));
+	var conversationId = lastResponse.context.conversation_id;
+	// fetch the last inserted record by the user based on its conversation Id
+	var getFeedBackIdSql = "SELECT feedback_id FROM `feedback` where conversationId = '" + conversationId + "' ORDER BY `feedback_id` DESC limit 1";
+	var feedbackoutput = executeQuerySync(getFeedBackIdSql);
+	var feedbackId = -1;
+	if (feedbackoutput != null && feedbackoutput.data!=null && feedbackoutput.data.rows!=null && feedbackoutput.data.rows.length > 0) {
+
+		feedbackId = feedbackoutput.data.rows[0].feedback_id;
+
 	}
 
-	var output_text = striptags(outputText);
-
-	if (outputText != null) {
-
-		lastOutputText = striptags(outputText);
-		lastOutputText = S(lastOutputText).replaceAll('?file', 'file').s;
-		lastOutputText = S(lastOutputText).replaceAll("openExcelDownloadWindow('", "openExcelDownloadWindow").s;
-		lastOutputText = S(lastOutputText).replaceAll("')>Download", "Download").s;
-		
-		//lastOutputText = S(lastOutputText).escapeHTML().s;
-	} else {
-		lastOutputText = striptags(lastOutputText);
-		lastOutputText = S(lastOutputText).replaceAll('?file', 'file').s;
-		lastOutputText = S(lastOutputText).replaceAll("openExcelDownloadWindow('", "openExcelDownloadWindow").s;
-		lastOutputText = S(lastOutputText).replaceAll("')>Download", "Download").s;
-	}
-
-
-	var intents = all_output.intents;
-	var intent = null;
-	if (intents[0] != null) {
-		intent = intents[0].intent;
-	}
-
-	var entities = all_output.entities;
-	var entity = null;
-	if (entities[0] != null) {
-
-		entity = entities[0].entity;
-	}
-	var feeds = feedback_value;
-	if (all_output.context.cxt_user_full_name != null) {
-		userFullName = all_output.context.cxt_user_full_name;
-	}
-	if (intent != null) {
-		lastUsedIntent = intent;
-	}
-	if (entity != null) {
-		lastUsedEntity = entity;
-	}
-	console.log("last used intent" + JSON.stringify(lastUsedIntent));
 	var feedback_sql = '';
 	if (ratingValue > 0) {
 		console.log("Insert feedback with rating =>" + JSON.stringify(ratingValue));
-		feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,rating_value) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','" + all_output.context.conversation_id + "',"+ratingValue+");";
-	} else{
-		feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, feedback,username,conversationId,feedback_comment,feedback_comment_other) VALUES ('" + inputText + "', '" + lastOutputText + "', '" + lastUsedIntent + "', '" + lastUsedEntity + "', '" + feeds + "','" + userFullName + "','" + all_output.context.conversation_id + "'," + feedbackReason + ",'" + feedbackReasonText + "');";
+		feedback_sql = "UPDATE feedback SET feedback = " + feedback_value + ",rating_value=" + ratingValue + " where feedback_id ="+feedbackId;
+	} else {
+		feedback_sql = "UPDATE feedback SET feedback = " + feedback_value + ",feedback_comment=" + feedbackReason + ",feedback_comment_other = '" + feedbackReasonText + "' where feedback_id="+feedbackId;
 	}
-	//console.log("query insert feedback =>" + feedback_sql);
+	console.log("query update feedback =>" + feedback_sql);
 	var output = executeQuerySync(feedback_sql);
-	console.log("output =>" + JSON.stringify(output));
+	//console.log("output =>" + JSON.stringify(output));
 	if (output.success) {
 		console.log("Feedback Inserted into database");
 		return true;
 	} else {
 		return false;
 	}
+
 }
 
 function recordResponseTime(response) {
@@ -340,17 +323,30 @@ function recordResponseTime(response) {
 		//console.log(response);
 		if (response.intents[0] != null) {
 			intent = response.intents[0].intent;
-			lastUsedIntent = intent;
+			//lastUsedIntent = intent;
 		}
 		if (response.entities[0] != null) {
 			entity = response.entities[0].entity;
-			lastUsedEntity = entity;
+			//lastUsedEntity = entity;
+			//putting entity in place of intent as mostly entities are of importance and tell the flow of dialog.
+			intent = entity;
 		}
+		var outputText = '';
+		//console.log(outputText);
+		for (i = 0; i < response.output.text.length; i++) {
+			outputText += response.output.text[i] + "<br/>";
+		}
+		outputText = striptags(outputText);
+		outputText = S(outputText).replaceAll('?file', 'file').s;
+		outputText = S(outputText).replaceAll("openExcelDownloadWindow('", "openExcelDownloadWindow").s;
+		outputText = S(outputText).replaceAll("')>Download", "Download").s;
 		conversationId = response.context.conversation_id;
 		fullName = response.context.cxt_user_full_name;
-		var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, username,conversationId) VALUES ('" + inputText + "', '" + striptags(outputText) + "', '" + intent + "', '" + entity + "','" + fullName + "','" + conversationId + "');";
-		//console.log("query insert feedback =>" + feedback_sql);
+		if (intent != null && entity != null && inputText!=null) {
+		var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, username,conversationId) VALUES ('" + inputText + "', '" + outputText + "', '" + intent + "', '" + entity + "','" + fullName + "','" + conversationId + "');";
+		console.log("record response time query =>" + feedback_sql);
 		var output = executeQuerySync(feedback_sql);
+		}
 	}
 
 
@@ -372,6 +368,7 @@ function updateMessage(input, response) {
 			response.output = {};
 		} else {
 			lastOutputText = response.output.text;
+			lastResponse = response;
 			recordResponseTime(response); // record time for every conversation message to get time of chat for one intent.
 			return response;
 		}

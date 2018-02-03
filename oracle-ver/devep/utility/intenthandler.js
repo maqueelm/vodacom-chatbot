@@ -39,12 +39,12 @@ module.exports = function () {
 
             }*/
         }
-        if (data.context.cxt_ci_flow_site_name == null) {
+        if (data.context != null && data.context.cxt_ci_flow_site_name == null) {
             isValidSitesIntent = false;
         }
 
         console.log("isValidSitesIntent=>" + isValidSitesIntent);
-        if (data.context.cxt_ci_flow_site_name != null && isValidSitesIntent) {
+        if (data.context != null && data.context.cxt_ci_flow_site_name != null && isValidSitesIntent) {
             console.log("handleSitesIntent");
             console.log("data.context.cxt_ci_flow_site_name=>" + data.context.cxt_ci_flow_site_name);
             var lookForSiteNames = "SELECT * from name_repo.NMG_CHATBOT_MV WHERE LOWER(CI_NAME) = '" + data.context.cxt_ci_flow_site_name.toLowerCase() + "'";
@@ -96,10 +96,7 @@ module.exports = function () {
 
     this.handleTransmissionFailureIntent = function (data, inputText, outputText, sync) {
 
-        if (data != null && data.intents[0] != null && data.intents[0].intent == "tier-cause-transmission-failure" || (data != null && data.entities[0] != null && data.entities[0].entity == "transmission-failures")) {
-
-
-
+        if (data != null && data.intents !=null && data.intents[0] != null && data.intents[0].intent == "tier-cause-transmission-failure" || (data != null && data.entities!=null && data.entities[0] != null && data.entities[0].entity == "transmission-failures")) {
             //console.log(JSON.stringify(data));
             var tier_cause_search_term = null;
             var output = null;
@@ -113,12 +110,12 @@ module.exports = function () {
                 }
             }
 
-            if (data.context.cxt_matched_customer_count > 0) {
+            if (data.context!=null && data.context.cxt_matched_customer_count > 0) {
                 validTransmissionFailureIntent = false;
             }
 
 
-            if (validTransmissionFailureIntent) {
+            if (data.context!=null && validTransmissionFailureIntent) {
                 console.log("handleTransmissionFailureIntent");
                 data.context.cxt_tx_name = tier_cause_search_term;
 
@@ -231,17 +228,20 @@ module.exports = function () {
 
                 }
             }
-
-            if (data.context.cxt_customer_drill_down_region != null) {
+           
+            if (data.context!=null && data.context.cxt_customer_drill_down_region != null) {
                 isValidCustomerIntent = true;
                 regionName = data.context.cxt_customer_drill_down_region;
             }
-            if (data.context.cxt_location_list_trx_failure_query != null) {
+            if (data.context!=null && data.context.cxt_location_list_trx_failure_query != null) {
                 isValidCustomerIntent = false;
+            }
+            if (data.context!=null && data.context.cxt_customer_flow_found) {
+                isValidCustomerIntent = true;
             }
         }
         console.log("isValidCustomerIntent=>" + isValidCustomerIntent);
-        if (data != null && data.context.cxt_user_selected_customer == null && isValidCustomerIntent && customerCount > 0) {
+        if (data != null && data.context!=null && data.context.cxt_user_selected_customer == null && isValidCustomerIntent && customerCount > 0) {
 
             console.log("\nhandleCustomerIntent\n");
             console.log("\ndata.context.cxt_customer_input_text=>" + data.context.cxt_customer_input_text);
@@ -275,7 +275,7 @@ module.exports = function () {
                 }
             }
 
-            if (data.context.cxt_complex_customer_pattern_case && !data.context.cxt_complex_customer_case && !data.context.cxt_plain_customer_name_case) {
+            if (data.context!=null && data.context.cxt_complex_customer_pattern_case && !data.context.cxt_complex_customer_case && !data.context.cxt_plain_customer_name_case) {
                 /* handle here when customer name matches only pattern and nothing else. Things to do there
                   1. Get the name that we have from pattern matching.
                   2. confirm if this name is in database using like operator % on end of the string only.
@@ -321,11 +321,11 @@ module.exports = function () {
 
             }
 
-            if (regionName != null && !data.context.cxt_complex_customer_case && !data.context.cxt_complex_customer_pattern_case) {
+            if (regionName != null && data.context!=null && !data.context.cxt_complex_customer_case && !data.context.cxt_complex_customer_pattern_case) {
                 customerSql += " AND LOWER(REGION) = '" + regionName.toLowerCase() + "'";
             }
 
-            if (data.context.cxt_plain_customer_name_case) {
+            if (data.context!=null && data.context.cxt_plain_customer_name_case) {
 
                 console.log("corporate customer customerSql =>" + customerSql);
 
@@ -358,7 +358,7 @@ module.exports = function () {
 
         }
 
-        if (data != null && data.intents!=null && data.intents[0].intent == 'corporate-customer' && data.intents[0].confidence < 0.5 && customerCount == 0) {
+        if (data != null && data.intents!=null && data.intents[0]!=null && data.intents[0].intent == 'corporate-customer' && data.intents[0].confidence < 0.5 && customerCount == 0) {
             // this code is written to handle the shit of Watson API that will not hit any intent in developer interface but when returned
             // in orchestration layer it shows corporate customer intent for unknown input with confidence less than 0.5 not sure why just applying a check to 
             // handle the scenario
@@ -367,9 +367,9 @@ module.exports = function () {
 
         }
 
-        if (data != null && data.context.cxt_customer_input_text != null && data.context.cxt_location_list_trx_failure_query == null && data.context.cxt_unknown_customer_case && !data.context.cxt_plain_customer_name_case && data.context.cxt_user_selected_customer == null) {
+        if (data != null && data.context!=null && data.context.cxt_customer_input_text != null && data.context.cxt_location_list_trx_failure_query == null && data.context.cxt_unknown_customer_case && !data.context.cxt_plain_customer_name_case && data.context.cxt_user_selected_customer == null) {
 
-            var sql = "Select DISTINCT MPLSVPN_NAME,IFACE_VLANID from  tellabs_ods.ebu_vlan_status_v";
+            var sql = "Select DISTINCT MPLSVPN_NAME,IFACE_VLANID from  tellabs_ods.ebu_vlan_status_mv";
 
             if (data.context.cxt_customer_input_text != null) {
                 customerInputText = data.context.cxt_customer_input_text;
@@ -387,10 +387,10 @@ module.exports = function () {
             var connection = getOracleDBConnection(sync);
             if (connection) {
 
-                output = getOracleQueryResult(connection, sql, sync);
+                var output = getOracleQueryResult(connection, sql, sync);
 
                 doRelease(connection);
-
+                console.log("output for unknown=>"+JSON.stringify(output));
                 if (output != null && output.rows != null && output.rows.length > 0) {
 
                     // add learning code here.
@@ -413,9 +413,7 @@ module.exports = function () {
                 data.context.cxt_customer_input_text = null;
 
             } else {
-                data.output.text = "<b>Sorry, i could not connect to data source for fetching the requested information. Please try again later.</b>";
-
-
+               data.output.text = "<b>Sorry, i could not connect to data source for fetching the requested information. Please try again later.</b>";
             }
 
         }
@@ -430,7 +428,7 @@ module.exports = function () {
     this.handleRegionIntent = function (data, inputText, outputText, sync) {
         var isValidRegionIntentCase = true;
         var regionName = null;
-        if (data != null && data.entities != null) {
+        if (data != null && data.entities != null && data.context!=null) {
 
             if (!data.context.cxt_region_show_isolated_fault && data.context.cxt_location_name_region_flow == null) {
                 isValidRegionIntentCase = true;
@@ -479,7 +477,7 @@ module.exports = function () {
         console.log("isValidRegionIntentCase =>" + isValidRegionIntentCase);
         console.log("data.context.cxt_matched_customer_count =>" + data.context.cxt_matched_customer_count);
 
-        if (data != null && data.entities != null && isValidRegionIntentCase && regionName != null && data.context.cxt_customer_drill_down_region == null) {
+        if (data != null && data.entities != null && isValidRegionIntentCase && regionName != null && data.context!=null && data.context.cxt_customer_drill_down_region == null) {
 
             /*  if (data.entities != null && data.entities.length <= 3
   
@@ -603,14 +601,17 @@ module.exports = function () {
                             console.log("child count for incident =>" + childoutput.rows[0].CHILD_COUNT);
                             childCount = childoutput.rows[0].CHILD_COUNT;
                         }
-                        data.output.text = orchestrateBotResponseTextForIncident(output.rows, data.output.text, data, childCount);
+                        data.output.text = orchestrateBotResponseTextForIncident(output.rows, data.output.text, data, childCount,sync);
 
                     } else {
 
                         //data = resetIncidentContext(data);
                         data = resetEveryThing(data);
-                        data.output.text = "<b>Sorry, no result can be found against given incident number " + incidentNumber + " in remedy. Please provide with a different incident number.</b>";
-
+                        data = getWatsonResponse(data,sync);
+                        var temp = data.output.text[0];
+                        data.output.text[0] = "<b>Sorry, no result can be found against given incident number " + incidentNumber + " in remedy. Please provide with a different incident number.</b>";
+                        data.output.text[1] = temp;
+                        //console.log("response =>"+JSON.stringify(data));
 
                     }
 
@@ -654,12 +655,12 @@ module.exports = function () {
 
         }
         //console.log("no result found for incident=>"+ JSON.stringify(data));
-        return data.output.text;
+        return data;
     }
 
     this.handleEscalationIntent = function (data, inputText, outputText, await, defer, discovery) {
 
-        if (data != null && data.intents[0] != null && data.intents[0].intent == "escalation" && data.intents[0].confidence > 0.5 || (data.entities[0] != null && data.entities[0] == 'escalation')) {
+        if (data != null && data.intents!=null && data.intents[0] != null && data.intents[0].intent == "escalation" && data.intents[0].confidence > 0.5 || (data.entities!=null && data.entities[0] != null && data.entities[0] == 'escalation')) {
             console.log("handleEscalationIntent");
             inputText = S(inputText).replaceAll('shift', '').s;
             inputText = S(inputText).replaceAll('report', '').s;
@@ -715,7 +716,8 @@ module.exports = function () {
     function createEntityValue(val, entityName) {
         val = S(val).replaceAll('corporate', '').s;
         val = S(val).replaceAll('customer', '').s;
-        if (val != '') {
+
+        if (val != '' && val.toLowerCase() !='region' && val.toLowerCase()!='corporate' && val.toLowerCase()!='customer') {
             var params = {
                 workspace_id: workspaceId,
                 entity: entityName,
@@ -757,6 +759,35 @@ module.exports = function () {
             }
 
         });
+    }
+
+    function getWatsonResponse(data,sync) {
+        var conversation = new Conversation({
+            // If unspecified here, the CONVERSATION_USERNAME and CONVERSATION_PASSWORD env properties will be checked
+            // After that, the SDK will fall back to the bluemix-provided VCAP_SERVICES environment property
+            username: process.env.CONVERSATION_USERNAME,
+            password: process.env.CONVERSATION_PASSWORD,
+            url: 'https://gateway.watsonplatform.net/conversation/api',
+            version_date: '2016-10-21',
+            version: 'v1'
+        });
+        var payload = {
+            workspace_id: process.env.WORKSPACE_ID,
+            context: data.context || {},
+            input: {}
+        };
+        // Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
+        var response = null;
+        try {
+            response = sync.await(conversation.message(payload, sync.defer()));
+    
+        } catch (err) {
+            //TODO Handle error
+            console.log("error=>" + JSON.stringify(err.message));
+        }
+        return response;
+    
+    
     }
 
 
