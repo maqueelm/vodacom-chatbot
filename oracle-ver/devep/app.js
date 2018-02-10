@@ -116,28 +116,12 @@ app.post('/api/message', function (req, res) {
 
 			if (conversationId != response.context.conversation_id) {
 				console.log("Conversation has been reset new conversation Id now =>" + response.context.conversation_id);
-				console.log("Conversation has been reset old conversation Id now =>" + conversationId);
-				response.context.conversation_id = conversationId;
+				console.log("Conversation has been reset old conversation Id =>" + conversationId);
+				//response.context.conversation_id = conversationId;
+				conversationId = response.context.conversation_id;
 			}
-			console.log(JSON.stringify(response));
-			if (response != null && response.context != null) {
-				response = startOverConversationWithContext(response);
-
-				response = showChildIncidentsWithContext(response, sync, conversationId);
-
-				response = showParentIncidentDetailsWithContext(response, sync);
-
-				response = showMasterIncidentForRegionWithContext(response, sync, conversationId);
-
-				response = regionIntentIsolatedFaultFlowWithContext(response, sync, conversationId);
-
-				response = technologyTypeFlowWithContext(response, sync, conversationId);
-
-				response = corporateCustomerFlowWithContext(response, sync);
-			} else {
-				console.log("Context is null");
-			}
-			//console.log("response =>" + JSON.stringify(response));
+			
+			console.log("response =>" + JSON.stringify(response));
 
 			if (response != null && response.context != null && response.context.cxt_user_logged_in) {
 
@@ -148,7 +132,7 @@ app.post('/api/message', function (req, res) {
 
 				/*Incident Intent Handling.*/
 				if (response != null && response.intents != null && response.intents.length != 0)
-					var data = handleIncidentIntent(response, inputText, incidentFlow, sync);
+				var data = handleIncidentIntent(response, inputText, incidentFlow, sync);
 				if (data != null && data.output != null) {
 					response.output.text = data.output.text;
 				}
@@ -177,13 +161,37 @@ app.post('/api/message', function (req, res) {
 
 
 				if (response != null && response.output != null && response.output.text[0] != null && response.context != null && response.context.cxt_location_list_trx_failure_query != null && response.context.cxt_location_name_trx_flow == null) {
-					console.log("response.context.cxt_location_list_trx_failure_query =>" + response.context.cxt_location_list_trx_failure_query);
-					console.log("replacing location name in message if there are any.");
+					//console.log("response.context.cxt_location_list_trx_failure_query =>" + response.context.cxt_location_list_trx_failure_query);
+					//console.log("replacing location name in message if there are any.");
 					response.output.text[0] = updateSuggestedLocationsInMessage(response.output.text[0], response.context.cxt_location_list_trx_failure_query, sync);
+				}
+				if (response.context.cxt_region_flow_search_for_location && response.context.cxt_location_list_region_fault_flow_query != null) {
+					//console.log("replace isolated_fault_location_list");
+				   //[isolated_fault_location_list_here]
+				   response.output.text[0] = updateSuggestedLocationsInMessage(response.output.text[0], response.context.cxt_location_list_region_fault_flow_query, sync);
 				}
 			}
 
-			response = userLoginWithContext(response);
+			//console.log(JSON.stringify(response));
+			if (response != null && response.context != null) {
+				response = startOverConversationWithContext(response,sync);
+
+				response = showChildIncidentsWithContext(response, sync, conversationId);
+
+				response = showParentIncidentDetailsWithContext(response, sync);
+
+				response = showMasterIncidentForRegionWithContext(response, sync, conversationId);
+
+				response = regionIntentIsolatedFaultFlowWithContext(response, sync, conversationId);
+
+				response = technologyTypeFlowWithContext(response, sync, conversationId);
+
+				response = corporateCustomerFlowWithContext(response, sync);
+			} else {
+				console.log("Context is null");
+			}
+
+			response = userLoginWithContext(response,sync);
 
 
 
@@ -317,16 +325,20 @@ function recordResponseTime(response) {
 	console.log("recordResponseTime");
 	var intent = null;
 	var entity = null;
+	var intentConfidence = null;
+	var entityConfidence = null;
 	var conversationId = null;
 	var fullName = null;
 	if (response != null) {
 		//console.log(response);
 		if (response.intents[0] != null) {
 			intent = response.intents[0].intent;
+			intentConfidence = response.intents[0].confidence; 	
 			//lastUsedIntent = intent;
 		}
 		if (response.entities[0] != null) {
 			entity = response.entities[0].entity;
+			entityConfidence = response.entities[0].confidence; 	
 			//lastUsedEntity = entity;
 			//putting entity in place of intent as mostly entities are of importance and tell the flow of dialog.
 			intent = entity;
@@ -343,7 +355,7 @@ function recordResponseTime(response) {
 		conversationId = response.context.conversation_id;
 		fullName = response.context.cxt_user_full_name;
 		if (intent != null && entity != null && inputText!=null) {
-		var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, username,conversationId) VALUES ('" + inputText + "', '" + outputText + "', '" + intent + "', '" + entity + "','" + fullName + "','" + conversationId + "');";
+		var feedback_sql = "INSERT INTO feedback (input_text, output_text, intents, entities, username,conversationId,intent_confidence,entity_confidence) VALUES ('" + inputText + "', '" + outputText + "', '" + intent + "', '" + entity + "','" + fullName + "','" + conversationId + "',"+intentConfidence+","+entityConfidence+");";
 		console.log("record response time query =>" + feedback_sql);
 		var output = executeQuerySync(feedback_sql);
 		}
@@ -361,7 +373,7 @@ function recordResponseTime(response) {
  */
 function updateMessage(input, response) {
 	//var responseText = null;
-	console.log("updateMessage=>" + response);
+	//console.log("updateMessage=>" + response);
 	if (response != null) {
 
 		if (!response.output) {

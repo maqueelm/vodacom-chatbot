@@ -1,11 +1,11 @@
 module.exports = function () {
 	var workspaceId = process.env.WORKSPACE_ID;
-    var Conversation = require("watson-developer-cloud/conversation/v1");
-    var conversation = new Conversation({
-        username: process.env.CONVERSATION_USERNAME,
-        password: process.env.CONVERSATION_PASSWORD,
-        version_date: '2017-05-26'
-    });
+	var Conversation = require("watson-developer-cloud/conversation/v1");
+	var conversation = new Conversation({
+		username: process.env.CONVERSATION_USERNAME,
+		password: process.env.CONVERSATION_PASSWORD,
+		version_date: '2017-05-26'
+	});
 	var excelbuilder = require('msexcel-builder');
 	var S = require('string');
 	require('./stringhandler')();
@@ -126,7 +126,7 @@ module.exports = function () {
 		} else {
 			response.output.text[0] = outputText;
 		}
-		
+
 		return response;
 
 	}
@@ -154,16 +154,16 @@ module.exports = function () {
 			}
 			outputText_new += "</table><br/>";
 		}
-		outputText = outputText_new;
-		outputText = addFeedbackButton(outputText);
+		//outputText = outputText_new;
+		outputText_new = addFeedbackButton(outputText_new);
 
 		if (response.output.text[0] != null) {
 			var temp = response.output.text[0];
-			response.output.text[0] = outputText;
+			response.output.text[0] = outputText_new;
 			response.output.text[1] = temp;
 
 		} else {
-			outputText = outputText_new;
+			response.output.text[0] = outputText_new;
 		}
 
 		//response.output.text[0] = outputText;
@@ -171,7 +171,7 @@ module.exports = function () {
 		return response;
 	}
 
-	this.orchestrateBotResponseTextForIncident = function (dbQueryResult, outputText, response, childCount,sync) {
+	this.orchestrateBotResponseTextForIncident = function (dbQueryResult, outputText, response, childCount, sync) {
 		console.log("orchestrateBotResponseTextForIncident = >Length of rows =>" + dbQueryResult.length);
 		//console.log ("dbQueryResult =>" + JSON.stringify(dbQueryResult));
 		if (dbQueryResult != null && dbQueryResult.length == 0) {
@@ -212,7 +212,7 @@ module.exports = function () {
 
 			//outputText = S(outputText).replaceAll('[DETAILED_DESCRIPTION]', dbQueryResult[0].DETAILED_DESCRIPTION).s;
 			//outputText = S(outputText).replaceAll('[WORK_LOG_DATE]', dbQueryResult[0].WORK_LOG_DATE).s;
-			console.log("Output after replace =>" + outputText);
+			//console.log("Output after replace =>" + outputText);
 			//outputText += "<br/><i><b>Incident Event Start:</b> <i>" + dbQueryResult[0].INCIDENT_EVENT_START_TIME;
 			if (dbQueryResult[0].INC_STATUS.toLowerCase() == 'closed') {
 
@@ -234,16 +234,16 @@ module.exports = function () {
 					response.context.cxt_incident_number = -1;
 
 					response = resetEveryThing(response);
-					response = getWatsonResponse(response,sync);
+					response = getWatsonResponse(response, sync,"No");
 					var temp = response.output.text[0];
 					outputText += "and it does not have any open child incidents.";
 					outputText = addFeedbackButton(outputText);
-                    response.output.text[0] = outputText;
-                    response.output.text[1] = temp;
+					response.output.text[0] = outputText;
+					response.output.text[1] = temp;
 					//response.output.text[0] = outputText;
 					//response.output.text[1] = "";
 					outputText = response.output.text;
-					
+
 				}
 			} else {
 				response.context.cxt_is_master_incident = false;
@@ -252,17 +252,17 @@ module.exports = function () {
 				outputText = addFeedbackButton(outputText);
 				response.output.text[0] = outputText;
 			}
-			
+
 
 
 
 		}
 
-		return outputText;
+		return response;
 	}
 
 	this.orchestrateBotResponseTextForRegion = function (dbQueryResult, outputText, regionName_2, data, sync) {
-		console.log("orchestrateBotResponseTextForRegion = >");
+		console.log("orchestrateBotResponseTextForRegion");
 		var masterIncidentCount = 0;
 		var childIncidentCount = 0;
 		//if (dbQueryResult != null) {
@@ -303,13 +303,14 @@ module.exports = function () {
 			}*/
 			//data.context.cxt_region_name = dbQueryResult[0].region;
 			//console.log("dbQueryResult=>"+JSON.stringify(dbQueryResult));
-			outputText = S(outputText).replaceAll('[open_incident_count]', "<b>" + totalCount + "</b>").s;
-			outputText = S(outputText).replaceAll('[region_name]', "<b>" + regionName_2 + "</b>").s;
-			outputText = S(outputText).replaceAll('[master_incident_count]', "<b>" + masterIncidentCount + "</b>").s;
-			outputText = S(outputText).replaceAll('[child_incident_count]', "<b>" + childIncidentCount + "</b>").s;
-			outputText = S(outputText).replaceAll('[is_are]', is_are).s;
-			outputText += "<br/><br/>Would you like to see details of master incident with linked child incidents or are you looking for an isolated fault? Please reply with <a href='#' id='master' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>master</a> or <a href='#' id='fault' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >fault</a>.";
-
+			//if (S(outputText).count("[region_name]") > 0) {
+				outputText = S(outputText).replaceAll('[open_incident_count]', "<b>" + totalCount + "</b>").s;
+				outputText = S(outputText).replaceAll('[region_name]', "<b>" + regionName_2 + "</b>").s;
+				outputText = S(outputText).replaceAll('[master_incident_count]', "<b>" + masterIncidentCount + "</b>").s;
+				outputText = S(outputText).replaceAll('[child_incident_count]', "<b>" + childIncidentCount + "</b>").s;
+				outputText = S(outputText).replaceAll('[is_are]', is_are).s;
+				outputText += "<br/><br/>Would you like to see details of master incident with linked child incidents or are you looking for an isolated fault? Please reply with <a href='#' id='master' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>master</a> or <a href='#' id='fault' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >fault</a>.";
+			//}
 		} else {
 			outputText = "<b>Sorry, no result can be found against given region " + regionName_2 + "</b>";
 		}
@@ -333,15 +334,14 @@ module.exports = function () {
 		var connection = getOracleDBConnection(sync);
 		var locationList = getOracleQueryResult(connection, locationListQuery, sync);
 		if (locationList != null && locationList.rows.length > 0) {
-			locationsText = "<b>Select the location name. Common Locations are</b> <br/><table>";
+			locationsText = "<b>Select the location name.</b> <br/><table class='w-90'>";
 			locationsText += "<tr><td><ul>";
 			var columnCount = 0;
 			for (i = 0; i < locationList.rows.length; i++) {
-				locationsText += "<li>";
-				var locationId= S(locationList.rows[i].LOCATION_NAME).replaceAll(' ', '').s;
-				locationsText += "<a href='#' id='" +locationId + "' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + locationList.rows[i].LOCATION_NAME + "</a>";
-				locationsText += "</li>";
-				if (i > 0 && i % 3 == 0) {
+				var locationId = S(locationList.rows[i].LOCATION_NAME).replaceAll(' ', '').s;
+				
+				//locationsText += "</li>";
+				if (i > 0 && i % 4 == 0) {
 					locationsText += "</ul></td><td><ul>";
 					columnCount++;
 				}
@@ -349,13 +349,16 @@ module.exports = function () {
 					locationsText += "</ul></td></tr><tr><td><ul>";
 					columnCount = 0;
 				}
+				locationsText += "<li><a href='#' id='" + locationId + "' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + locationList.rows[i].LOCATION_NAME + "</a></li>";
 
 			}
-			locationsText += "</tr></table>";
+			locationsText += "</ul></td></tr></td></table>";
 
 
 		}
 		messageText = S(messageText).replaceAll('[trx_locations_here]', locationsText).s;
+		messageText = S(messageText).replaceAll('[isolated_fault_location_list_here]', locationsText).s;
+		
 		if (locationsText == '') {
 			messageText = "<b>Select the location name. Common Locations are <a id='location_0' href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>Bellville</a>,<a id='location_1' href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>Century City</a></b> <br/>";
 		}
@@ -396,7 +399,7 @@ module.exports = function () {
 				if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 					break;
 				}
-				outputText_new += "<tr><td><a id='" + dbQueryResult[i].INCIDENT_NUMBER + "' href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + dbQueryResult[i].INCIDENT_NUMBER + "</a></td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td><a id='ci_lnk_ci'" + i + " href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + dbQueryResult[i].SITE_NAME + "</a></td></tr>";
+				outputText_new += "<tr><td><a id='" + dbQueryResult[i].INCIDENT_NUMBER + "' href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + dbQueryResult[i].INCIDENT_NUMBER + "</a></td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td><a id='" + dbQueryResult[i].SITE_NAME + " href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + dbQueryResult[i].SITE_NAME + "</a></td></tr>";
 
 			}
 			outputText_new += "</table><br/>";
@@ -521,7 +524,7 @@ module.exports = function () {
 				if (i > 10 && dbQueryResult.length > excelGenerationRecordCountLimit) {
 					break;
 				}
-				outputText_new += "<tr><td><a id='inc_lnk_" + dbQueryResult[i].INCIDENT_NUMBER + "' href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + dbQueryResult[i].INCIDENT_NUMBER + "</a></td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
+				outputText_new += "<tr><td><a id='" + dbQueryResult[i].INCIDENT_NUMBER + "' href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + dbQueryResult[i].INCIDENT_NUMBER + "</a></td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
 
 			}
 			outputText_new += "</table><br/>";
@@ -560,7 +563,7 @@ module.exports = function () {
 			outputText_new += "<tr><th>INCIDENT NUMBER</th><th>DESCRIPTION</th><th>STATUS</th><th>SITE NAME</th></tr>";
 			for (i = 0; i < dbQueryResult.length; i++) {
 
-				outputText_new += "<tr><td><a id='inc_lnk_" + dbQueryResult[i].INCIDENT_NUMBER + "' href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + dbQueryResult[i].INCIDENT_NUMBER + "</a></td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
+				outputText_new += "<tr><td><a id='" + dbQueryResult[i].INCIDENT_NUMBER + "' href='#' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area'>" + dbQueryResult[i].INCIDENT_NUMBER + "</a></td><td>" + dbQueryResult[i].SUMMARY + "</td><td>" + dbQueryResult[i].INC_STATUS + "</td><td>" + dbQueryResult[i].SITE_NAME + "</td></tr>";
 
 			}
 			outputText_new += "</table><br/>";
@@ -614,10 +617,14 @@ module.exports = function () {
 		var cause_tier_1 = response.context.cxt_tx_name;
 		var childIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as CHILDCOUNT from " + incidentTableName + " where (inc.INCIDENT_ASSOCIATION_TYPE = 1 and  inc.STATUS in (0,1,2,3)) ";
 		childIncidentCountsql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-		if (cause_tier_1.toLowerCase() == 'transmission') {
-			childIncidentCountsql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx')";
-		} else {
-			childIncidentCountsql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) = '" + cause_tier_1.toLowerCase() + "'";
+		//if (cause_tier_1.toLowerCase() == 'transmission') {
+		//	childIncidentCountsql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx')";
+		//} else {
+			childIncidentCountsql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) = '" + cause_tier_1.toLowerCase() + "'";
+		//}
+
+		if (response.context.cxt_tech_type_region_full_name != null) {
+			childIncidentCountsql += " and LOWER(inc.REGION) = '" + response.context.cxt_tech_type_region_full_name.toLowerCase() + "'";
 		}
 
 		console.log("childIncidentCountsql =>" + childIncidentCountsql);
@@ -631,10 +638,14 @@ module.exports = function () {
 		//LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx');
 		var masterIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as MASTERCOUNT from " + incidentTableName + " inner join " + incidentTableName_2 + "  on (inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3))";
 		masterIncidentCountsql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-		if (cause_tier_1.toLowerCase() == 'transmission') {
-			masterIncidentCountsql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx') ";
-		} else {
-			masterIncidentCountsql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) = '" + cause_tier_1.toLowerCase() + "' ";
+		//if (cause_tier_1.toLowerCase() == 'transmission') {
+		//	masterIncidentCountsql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx') ";
+		//} else {
+			masterIncidentCountsql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) = '" + cause_tier_1.toLowerCase() + "' ";
+		//}
+
+		if (response.context.cxt_tech_type_region_full_name != null) {
+			masterIncidentCountsql += " and LOWER(inc.REGION) = '" + response.context.cxt_tech_type_region_full_name.toLowerCase() + "'";
 		}
 
 		//var masterIncidentCountsql = "Select count(distinct inc.ORIGINAL_INCIDENT_NUMBER) as MASTERCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER and inc_2.INCIDENT_ASSOCIATION_TYPE  = 0) where LOWER(inc.region) = '" + regionName_2.toLowerCase() + "' and inc_2.STATUS not in (5,6) ";//and inc_2.STATUS not in (5,6)
@@ -667,7 +678,8 @@ module.exports = function () {
 			outputText = S(outputText).replaceAll('[is_are]', is_are).s;
 			outputText += "<br/>Do you want to further drill down the search? reply with <b<b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >yes</a></b>&nbsp; <b><a href='#' id='no' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >no</a></b></b>.";
 		} else {
-			outputText_new = "<br/><b>No</b> incidents found against the given domain. If you want to search anything else reply with <b><a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >yes</a></b>.";
+			outputText_new = "<br/><b>No</b> incidents found against the given domain <b>"+cause_tier_1+"</b>. <b>If you want to search anything else reply with <a href='#' id='yes' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >yes</a></b>.";
+			//response = getWatsonResponse(response, sync,"yes");
 			response = resetEveryThing(response);
 		}
 
@@ -748,34 +760,40 @@ module.exports = function () {
 
 	}
 
-	function getWatsonResponse(data,sync) {
-        var conversation = new Conversation({
-            // If unspecified here, the CONVERSATION_USERNAME and CONVERSATION_PASSWORD env properties will be checked
-            // After that, the SDK will fall back to the bluemix-provided VCAP_SERVICES environment property
-            username: process.env.CONVERSATION_USERNAME,
-            password: process.env.CONVERSATION_PASSWORD,
-            url: 'https://gateway.watsonplatform.net/conversation/api',
-            version_date: '2016-10-21',
-            version: 'v1'
-        });
-        var payload = {
-            workspace_id: process.env.WORKSPACE_ID,
-            context: data.context || {},
-            input: {}
-        };
-        // Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
-        var response = null;
-        try {
-            response = sync.await(conversation.message(payload, sync.defer()));
-    
-        } catch (err) {
-            //TODO Handle error
-            console.log("error=>" + JSON.stringify(err.message));
-        }
-        return response;
-    
-    
-    }
+	function getWatsonResponse(data, sync,inputText) {
+		var conversation = new Conversation({
+			// If unspecified here, the CONVERSATION_USERNAME and CONVERSATION_PASSWORD env properties will be checked
+			// After that, the SDK will fall back to the bluemix-provided VCAP_SERVICES environment property
+			username: process.env.CONVERSATION_USERNAME,
+			password: process.env.CONVERSATION_PASSWORD,
+			url: 'https://gateway.watsonplatform.net/conversation/api',
+			version_date: '2016-10-21',
+			version: 'v1'
+		});
+		var inputJSON = {};
+		if (inputText !=null){
+			inputJSON = {"text":inputText};
+		} 
+		var payload = {
+			workspace_id: process.env.WORKSPACE_ID,
+			context: data.context || {},
+			input: inputJSON
+		};
+		//console.log("payload=>"+JSON.stringify(payload.input));
+		// Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
+		var response = null;
+		try {
+			response = sync.await(conversation.message(payload, sync.defer()));
+
+		} catch (err) {
+			//TODO Handle error
+			console.log("error=>" + JSON.stringify(err.message));
+		}
+		//console.log("getWatsonResponse=>"+JSON.stringify(response));
+		return response;
+
+
+	}
 
 
 

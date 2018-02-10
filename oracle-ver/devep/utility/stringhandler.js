@@ -127,11 +127,12 @@ module.exports = function () {
     }
     this.resetTransmissionFailureContext = function (data) {
         data.context.cxt_tx_name = null;
-        data.context.cxt_tx_found_incident_count = -1;
+        data.context.cxt_tx_found_incident_count = 0;
         data.context.cxt_location_list_trx_failure_query = null;
         data.context.cxt_location_name_trx_flow_found = false;
         data.context.cxt_location_name_trx_flow = null;
         data.context.cxt_tech_type_region = null;
+        data.context.cxt_tech_type_region_full_name = null;
         return data;
     }
 

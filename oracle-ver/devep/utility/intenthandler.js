@@ -96,7 +96,7 @@ module.exports = function () {
 
     this.handleTransmissionFailureIntent = function (data, inputText, outputText, sync) {
 
-        if (data != null && data.intents !=null && data.intents[0] != null && data.intents[0].intent == "tier-cause-transmission-failure" || (data != null && data.entities!=null && data.entities[0] != null && data.entities[0].entity == "transmission-failures")) {
+        if (data != null && data.entities != null && data.intents != null && data.intents[0] != null && data.intents[0].intent == 'tier-cause-transmission-failure' && data.intents[0].confidence > 0.5) {
             //console.log(JSON.stringify(data));
             var tier_cause_search_term = null;
             var output = null;
@@ -108,14 +108,19 @@ module.exports = function () {
                     tier_cause_search_term = data.entities[i].value;
                     validTransmissionFailureIntent = true;
                 }
+                if (data.entities[i] != null && data.entities[i].entity == 'site-names-pattern') {
+                    validTransmissionFailureIntent = false;
+                    break;
+                }
             }
 
-            if (data.context!=null && data.context.cxt_matched_customer_count > 0) {
+            if (data.context != null && data.context.cxt_matched_customer_count > 0) {
                 validTransmissionFailureIntent = false;
             }
 
+            console.log("validTransmissionFailureIntent=>" + validTransmissionFailureIntent);
 
-            if (data.context!=null && validTransmissionFailureIntent) {
+            if (data.context != null && validTransmissionFailureIntent) {
                 console.log("handleTransmissionFailureIntent");
                 data.context.cxt_tx_name = tier_cause_search_term;
 
@@ -126,22 +131,25 @@ module.exports = function () {
                     locatoinForFailureSql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
                     // var locatoinForFailureSql = "Select inc.HPD_CI as SITE_NAME from " + incidentTableName + " where inc.STATUS in (0,1,2,3) ";
                     if (tier_cause_search_term.toLowerCase() == 'transmission') {
-                        locatoinForFailureSql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx')";
+                        locatoinForFailureSql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx')";
                     } else {
-                        locatoinForFailureSql += " and LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) = '" + tier_cause_search_term.toLowerCase() + "'";
+                        locatoinForFailureSql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) = '" + tier_cause_search_term.toLowerCase() + "'";
                     }
-
+                    var regionFullName = '';
                     if (data.context.cxt_tech_type_region != null) {
 
                         var regionLookupQuery = "Select * from region_lookup where (LOWER(abbreviation) = '" + data.context.cxt_tech_type_region.toLowerCase() + "' OR LOWER(full_name) = '" + data.context.cxt_tech_type_region.toLowerCase() + "')";
                         console.log("lookup query =>" + regionLookupQuery);
                         var lookupResult = executeQuerySync(regionLookupQuery);
-                        var regionFullName = '';
+
                         if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows[0] != null) {
                             regionFullName = lookupResult.data.rows[0].full_name;
                         }
 
+                        console.log("regionFullName=>" + regionFullName);
+
                         locatoinForFailureSql += " and LOWER(inc.region) = '" + regionFullName.toLowerCase() + "'";
+                        data.context.cxt_tech_type_region_full_name = regionFullName.toLowerCase();
                     }
 
                     // locatoinForFailureSql += " and rownum < 999";
@@ -172,6 +180,7 @@ module.exports = function () {
                             if (data.context.cxt_tech_type_region != null) {
                                 locationSql += " and LOWER(region) = '" + data.context.cxt_tech_type_region.toLowerCase() + "'";
                             }
+                            locationSql += " order by LOCATION_NAME";
                             data.context.cxt_location_list_trx_failure_query = locationSql;
                             //console.log("data.context.cxt_location_list_trx_failure=>" + data.context.cxt_location_list_trx_failure);
 
@@ -228,20 +237,20 @@ module.exports = function () {
 
                 }
             }
-           
-            if (data.context!=null && data.context.cxt_customer_drill_down_region != null) {
+
+            if (data.context != null && data.context.cxt_customer_drill_down_region != null) {
                 isValidCustomerIntent = true;
                 regionName = data.context.cxt_customer_drill_down_region;
             }
-            if (data.context!=null && data.context.cxt_location_list_trx_failure_query != null) {
+            if (data.context != null && data.context.cxt_location_list_trx_failure_query != null) {
                 isValidCustomerIntent = false;
             }
-            if (data.context!=null && data.context.cxt_customer_flow_found) {
+            if (data.context != null && data.context.cxt_customer_flow_found) {
                 isValidCustomerIntent = true;
             }
         }
         console.log("isValidCustomerIntent=>" + isValidCustomerIntent);
-        if (data != null && data.context!=null && data.context.cxt_user_selected_customer == null && isValidCustomerIntent && customerCount > 0) {
+        if (data != null && data.context != null && data.context.cxt_user_selected_customer == null && isValidCustomerIntent && customerCount > 0) {
 
             console.log("\nhandleCustomerIntent\n");
             console.log("\ndata.context.cxt_customer_input_text=>" + data.context.cxt_customer_input_text);
@@ -275,7 +284,7 @@ module.exports = function () {
                 }
             }
 
-            if (data.context!=null && data.context.cxt_complex_customer_pattern_case && !data.context.cxt_complex_customer_case && !data.context.cxt_plain_customer_name_case) {
+            if (data.context != null && data.context.cxt_complex_customer_pattern_case && !data.context.cxt_complex_customer_case && !data.context.cxt_plain_customer_name_case) {
                 /* handle here when customer name matches only pattern and nothing else. Things to do there
                   1. Get the name that we have from pattern matching.
                   2. confirm if this name is in database using like operator % on end of the string only.
@@ -321,11 +330,11 @@ module.exports = function () {
 
             }
 
-            if (regionName != null && data.context!=null && !data.context.cxt_complex_customer_case && !data.context.cxt_complex_customer_pattern_case) {
+            if (regionName != null && data.context != null && !data.context.cxt_complex_customer_case && !data.context.cxt_complex_customer_pattern_case) {
                 customerSql += " AND LOWER(REGION) = '" + regionName.toLowerCase() + "'";
             }
 
-            if (data.context!=null && data.context.cxt_plain_customer_name_case) {
+            if (data.context != null && data.context.cxt_plain_customer_name_case) {
 
                 console.log("corporate customer customerSql =>" + customerSql);
 
@@ -358,16 +367,9 @@ module.exports = function () {
 
         }
 
-        if (data != null && data.intents!=null && data.intents[0]!=null && data.intents[0].intent == 'corporate-customer' && data.intents[0].confidence < 0.5 && customerCount == 0) {
-            // this code is written to handle the shit of Watson API that will not hit any intent in developer interface but when returned
-            // in orchestration layer it shows corporate customer intent for unknown input with confidence less than 0.5 not sure why just applying a check to 
-            // handle the scenario
-            data.context.cxt_customer_input_text = data.input.text;
-            data.context.cxt_unknown_customer_case = true;
 
-        }
 
-        if (data != null && data.context!=null && data.context.cxt_customer_input_text != null && data.context.cxt_location_list_trx_failure_query == null && data.context.cxt_unknown_customer_case && !data.context.cxt_plain_customer_name_case && data.context.cxt_user_selected_customer == null) {
+        if (data != null && data.context != null && data.context.cxt_customer_input_text != null && data.context.cxt_location_list_trx_failure_query == null && data.context.cxt_unknown_customer_case && !data.context.cxt_plain_customer_name_case && data.context.cxt_user_selected_customer == null) {
 
             var sql = "Select DISTINCT MPLSVPN_NAME,IFACE_VLANID from  tellabs_ods.ebu_vlan_status_mv";
 
@@ -390,7 +392,7 @@ module.exports = function () {
                 var output = getOracleQueryResult(connection, sql, sync);
 
                 doRelease(connection);
-                console.log("output for unknown=>"+JSON.stringify(output));
+                console.log("output for unknown=>" + JSON.stringify(output));
                 if (output != null && output.rows != null && output.rows.length > 0) {
 
                     // add learning code here.
@@ -413,8 +415,17 @@ module.exports = function () {
                 data.context.cxt_customer_input_text = null;
 
             } else {
-               data.output.text = "<b>Sorry, i could not connect to data source for fetching the requested information. Please try again later.</b>";
+                data.output.text = "<b>Sorry, i could not connect to data source for fetching the requested information. Please try again later.</b>";
             }
+
+        }
+
+        if (data != null && data.intents != null && data.intents[0] != null && data.intents[0].intent == 'corporate-customer' && data.intents[0].confidence < 0.5 && customerCount == 0) {
+            // this code is written to handle the shit of Watson API that will not hit any intent in developer interface but when returned
+            // in orchestration layer it shows corporate customer intent for unknown input with confidence less than 0.5 not sure why just applying a check to 
+            // handle the scenario
+            data.context.cxt_customer_input_text = data.input.text;
+            data.context.cxt_unknown_customer_case = true;
 
         }
         // handling regiona and customer name case
@@ -428,7 +439,7 @@ module.exports = function () {
     this.handleRegionIntent = function (data, inputText, outputText, sync) {
         var isValidRegionIntentCase = true;
         var regionName = null;
-        if (data != null && data.entities != null && data.context!=null) {
+        if (data != null && data.entities != null && data.context != null) {
 
             if (!data.context.cxt_region_show_isolated_fault && data.context.cxt_location_name_region_flow == null) {
                 isValidRegionIntentCase = true;
@@ -442,25 +453,32 @@ module.exports = function () {
 
 
             for (i = 0; i < data.entities.length; i++) {
-                if (data.entities[i].entity == 'escalation' || data.entities[i].entity == "2g-sites") {
+
+                if (data.entities[i].entity == 'regions' || data.entities[i].entity == "sys-location") {
+                    regionName = data.entities[i].value;
+                    isValidRegionIntentCase = true;
+                }
+
+                // check if site name contains region name
+                if (data.entities[i].entity == 'escalation' || data.entities[i].entity == "2g-sites" || data.entities[i].entity == 'sites-node-pattern' || data.entities[i].entity == 'site-names-pattern') {
                     isValidRegionIntentCase = false;
                     break;
                 }
+                // check if customer name contains region name
                 if (data.entities[i].entity == "complex-customers-patterns" || data.entities[i].entity == "complex-corporate-customers" || data.entities[i].entity == "corporate-customers") {
                     isValidRegionIntentCase = false;
                     break;
                 }
-                if (data.entities[i].entity == 'regions' || data.entities[i].entity == "sys-location") {
-                    regionName = data.entities[i].value;
-                    isValidRegionIntentCase = true;
-                } else {
-                    isValidRegionIntentCase = false;
-                }
+
                 if (data.entities[i].entity == "transmission-failures") {
                     isValidRegionIntentCase = false;
                     break;
                 }
 
+            }
+
+            if (regionName == null) {
+                isValidRegionIntentCase = false;
             }
 
             if (data.context.cxt_unknown_customer_case != null) {
@@ -469,31 +487,32 @@ module.exports = function () {
             if (data.context.cxt_location_list_trx_failure_query != null) {
                 isValidRegionIntentCase = false;
             }
+            if (data.context.cxt_region_show_isolated_fault) {
+                // this check will handle the case when location name in isolated fault contains region
+                isValidRegionIntentCase = false;
+            }
+            if (data.context.cxt_customer_drill_down_region != null) {
+                isValidRegionIntentCase = false;
+            }
+
         }
 
 
 
         console.log("region name =>" + regionName);
         console.log("isValidRegionIntentCase =>" + isValidRegionIntentCase);
-        console.log("data.context.cxt_matched_customer_count =>" + data.context.cxt_matched_customer_count);
+        //console.log("data.context.cxt_matched_customer_count =>" + data.context.cxt_matched_customer_count);
 
-        if (data != null && data.entities != null && isValidRegionIntentCase && regionName != null && data.context!=null && data.context.cxt_customer_drill_down_region == null) {
-
-            /*  if (data.entities != null && data.entities.length <= 3
-  
-                  && ((data.entities[0] != null && data.entities[0].entity == "regions") || (data.entities[1] != null && data.entities[1].entity == "regions") || (data.entities[0] != null && data.entities[0].entity == "sys-location" || data.entities[1] != null && data.entities[1].entity == "sys-location"))
-  
-              ) {*/
+        if (isValidRegionIntentCase) {
             console.log("handleRegionIntent");
-            data.context.cxt_region_name = regionName;
             var fullName = "";
-
             var regionLookupQuery = "Select * from region_lookup where (LOWER(abbreviation) = '" + regionName.toLowerCase() + "' OR LOWER(full_name) = '" + regionName.toLowerCase() + "')";
             console.log("lookup query =>" + regionLookupQuery);
             var lookupResult = executeQuerySync(regionLookupQuery);
             if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows[0] != null) {
                 regionName = lookupResult.data.rows[0].full_name;
             }
+            data.context.cxt_region_name = regionName;
             data.context.cxt_region_full_name = regionName;
             data.output.text = orchestrateBotResponseTextForRegion(null, data.output.text, regionName, data, sync);
         }
@@ -514,9 +533,15 @@ module.exports = function () {
                 if (data.entities[i] != null && (data.entities[i].entity == 'complex-customers-patterns' || data.entities[i].entity == 'complex-corporate-customers' || data.entities[i].entity == 'corporate-customers' || data.entities[i].entity == '2g-sites')) {
                     isValidIncidentIntent = false;
                     customerNameDetected = true;
+                    break;
                 }
                 if (data.intents[i] != null && (data.intents[i].intent == "sites" || data.intents[i].intent == "regions")) {
                     isValidIncidentIntent = false;
+                    break;
+                }
+                if (data.entities[i].entity == "2g-sites" || data.entities[i].entity == 'sites-node-pattern' || data.entities[i].entity == 'site-names-pattern') {
+                    isValidIncidentIntent = false;
+                    break;
                 }
                 if (data.entities[i] != null && data.entities[i].entity == "incidents") {
                     isValidIncidentIntent = true;
@@ -525,12 +550,10 @@ module.exports = function () {
                     isValidIncidentIntent = true;
                 }
                 if (data.entities[i].entity == 'sys-number') {
-                    console.log("incident number matched by entity");
+                    console.log("incident number matched by entity sys-number");
                     incidentNumber = data.entities[i].value;
                 }
-                if (data.entities[i] != null && data.entities[i].entity == "sites-node-pattern") {
-                    isValidIncidentIntent = false;
-                }
+                
 
             }
             if (inputText != null) {
@@ -563,14 +586,14 @@ module.exports = function () {
                 var sql = "SELECT " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and inc.INCIDENT_NUMBER  = '" + incidentNumber + "'";
                 //"(SELECT * FROM (SELECT incident_number, DETAILED_DESCRIPTION, work_log_type, TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (WORK_LOG_DATE + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as WORK_LOG_DATE FROM ARADMIN.HPD_WORKLOG where incident_number = '" + incidentNumber + "' ORDER BY work_log_date desc) WHERE rownum = 1) B on A.incident_number = B.incident_number";
 
-                console.log("Inciddent SQL=>" + sql);
+                //console.log("Inciddent SQL=>" + sql);
                 var connection = getOracleDBConnectionRemedy(sync);
                 if (connection) {
 
                     var output = getOracleQueryResult(connection, sql, sync);
-                    console.log("output.rows.length=>" + JSON.stringify(output.rows.length));
-                    console.log("output.rows=>" + JSON.stringify(output.rows));
-                    if (output!=null  && output.rows!=null && output.rows.length>0 && output.rows[0].RELATIONSHIP_TYPE != "Child") {
+                    //console.log("output.rows.length=>" + JSON.stringify(output.rows.length));
+                    //console.log("output.rows=>" + JSON.stringify(output.rows));
+                    if (output != null && output.rows != null && output.rows.length > 0 && output.rows[0].RELATIONSHIP_TYPE != "Child") {
                         console.log("incident is not child incident");
                         var sql = "SELECT * from (SELECT " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and tas.status != '6000' and inc.INCIDENT_NUMBER  = '" + incidentNumber + "') A left join" +
                             "(SELECT * FROM (SELECT incident_number, DETAILED_DESCRIPTION, work_log_type, TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (WORK_LOG_DATE + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as WORK_LOG_DATE FROM ARADMIN.HPD_WORKLOG where incident_number = '" + incidentNumber + "' ORDER BY work_log_date desc) WHERE rownum = 1) B on A.incident_number = B.incident_number";
@@ -590,28 +613,28 @@ module.exports = function () {
 
                     doRelease(connection);
                     if (output != null && output.rows != null && output.rows.length > 0) {
-                        console.log("found incident");
+                        //console.log("found incident");
                         var childsql = "Select count(*) as CHILD_COUNT from " + incidentTableName + " where inc.STATUS in (0,1,2,3)  and inc.ORIGINAL_INCIDENT_NUMBER  = '" + incidentNumber + "' and inc.INCIDENT_ASSOCIATION_TYPE = 1";
-                        console.log("child incident count query =>" + childsql);
+                        //console.log("child incident count query =>" + childsql);
                         var connection = getOracleDBConnectionRemedy(sync);
                         var childoutput = getOracleQueryResult(connection, childsql, sync);
                         doRelease(connection);
                         var childCount = 0;
                         if (childoutput != null && childoutput.rows != null) {
-                            console.log("child count for incident =>" + childoutput.rows[0].CHILD_COUNT);
+                            //console.log("child count for incident =>" + childoutput.rows[0].CHILD_COUNT);
                             childCount = childoutput.rows[0].CHILD_COUNT;
                         }
-                        data.output.text = orchestrateBotResponseTextForIncident(output.rows, data.output.text, data, childCount,sync);
+                        data = orchestrateBotResponseTextForIncident(output.rows, data.output.text, data, childCount, sync);
 
                     } else {
 
-                        //data = resetIncidentContext(data);
+
                         data = resetEveryThing(data);
-                        data = getWatsonResponse(data,sync);
+                        data = getWatsonResponse(data, sync);
                         var temp = data.output.text[0];
                         data.output.text[0] = "<b>Sorry, no result can be found against given incident number " + incidentNumber + " in remedy. Please provide with a different incident number.</b>";
                         data.output.text[1] = temp;
-                        //console.log("response =>"+JSON.stringify(data));
+
 
                     }
 
@@ -660,7 +683,7 @@ module.exports = function () {
 
     this.handleEscalationIntent = function (data, inputText, outputText, await, defer, discovery) {
 
-        if (data != null && data.intents!=null && data.intents[0] != null && data.intents[0].intent == "escalation" && data.intents[0].confidence > 0.5 || (data.entities!=null && data.entities[0] != null && data.entities[0] == 'escalation')) {
+        if (data != null && data.intents != null && data.intents[0] != null && data.intents[0].intent == "escalation" && data.intents[0].confidence > 0.5 || (data.entities != null && data.entities[0] != null && data.entities[0] == 'escalation')) {
             console.log("handleEscalationIntent");
             inputText = S(inputText).replaceAll('shift', '').s;
             inputText = S(inputText).replaceAll('report', '').s;
@@ -717,7 +740,7 @@ module.exports = function () {
         val = S(val).replaceAll('corporate', '').s;
         val = S(val).replaceAll('customer', '').s;
 
-        if (val != '' && val.toLowerCase() !='region' && val.toLowerCase()!='corporate' && val.toLowerCase()!='customer') {
+        if (val != '' && val.toLowerCase() != 'region' && val.toLowerCase() != 'corporate' && val.toLowerCase() != 'customer' && val.toLowerCase() != 'yes' && val.toLowerCase() != 'no') {
             var params = {
                 workspace_id: workspaceId,
                 entity: entityName,
@@ -761,7 +784,7 @@ module.exports = function () {
         });
     }
 
-    function getWatsonResponse(data,sync) {
+    function getWatsonResponse(data, sync) {
         var conversation = new Conversation({
             // If unspecified here, the CONVERSATION_USERNAME and CONVERSATION_PASSWORD env properties will be checked
             // After that, the SDK will fall back to the bluemix-provided VCAP_SERVICES environment property
@@ -780,14 +803,14 @@ module.exports = function () {
         var response = null;
         try {
             response = sync.await(conversation.message(payload, sync.defer()));
-    
+
         } catch (err) {
             //TODO Handle error
             console.log("error=>" + JSON.stringify(err.message));
         }
         return response;
-    
-    
+
+
     }
 
 

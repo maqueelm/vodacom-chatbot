@@ -89,7 +89,7 @@
         }
 
         table td {
-            padding: 5px;
+            padding: 5px 0px 0px 0px;
             vertical-align: top;
             font-size: 13px !important;
         }
@@ -235,6 +235,9 @@
             text-decoration: none;
             line-height: 5em;
         }
+        ol,ul {
+            line-height: 1.4em;
+        }
     </style>
 </head>
 
@@ -254,7 +257,8 @@
                         </div>
                         <!--SO:button-->
                         <div class="col-xs-12 button-container no-padding">
-                            <button class="start-over" id='startover' onclick='copyToTypingArea(this);'>Start over</button>
+                            <button class="start-over" id='startover' style='display:none;'>Start over</button>
+                            <!--onclick='copyToTypingArea(this);'-->
                         </div>
                         <!--EO:button-->
                         <!--SO:middle field (whatson & user box feilds-->
