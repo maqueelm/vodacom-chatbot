@@ -1,0 +1,38 @@
+.rating {
+    unicode-bidi: bidi-override;
+    direction: rtl;
+    text-align: left;
+    font-size: 25px;
+  }
+  .rating > span {
+    display: inline-block;
+    position: relative;
+    width: 1.1em;
+  }
+  .rating > span:hover:before,
+  .rating > span:hover ~ span:before {
+     content: "\2605";
+     position: absolute;
+     left:0;
+     color:gold;
+  }
+
+  .gif-loader{
+    
+    background-image: url("../img/ajax-loader.gif");
+    background-repeat: no-repeat;
+    text-indent: 0px;
+    background-position-x: 140px;
+    background-position-y: 15px;
+  }
+  .hidden {
+    display:none;
+  }
+  #agent-waiting-msg{
+    color:white;
+    font-weight:bold;
+  }
+  .agent-waiting-msg::-webkit-input-placeholder {
+    color: #F73C0A;
+ 
+}
