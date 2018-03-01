@@ -1,22 +1,21 @@
+/**
+ * Description
+ * @method exports
+ * @return 
+ */
 module.exports = function () {
-    var workspaceId = process.env.WORKSPACE_ID;
-    var Conversation = require("watson-developer-cloud/conversation/v1");
-    var conversation = new Conversation({
-        username: process.env.CONVERSATION_USERNAME,
-        password: process.env.CONVERSATION_PASSWORD,
-        version_date: '2017-05-26'
-    });
     require('../db/db-oracle.js')();
     require('./stringhandler')();
     require('./sqlhandler')();
+    require('./watsonentityhandler')();
     var S = require('string');
-    var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
-    var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
-    var taskTable = "ARADMIN.TMS_TASK";
-    var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,decode(INC.INCIDENT_ASSOCIATION_TYPE,1,'Child',0,'Master',null,'Standalone',INC.INCIDENT_ASSOCIATION_TYPE) as RELATIONSHIP_TYPE,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,inc.ASSIGNED_GROUP,inc.RESOLUTION_CATEGORY_TIER_2 as RESOLUTION_CATEGORY_TIER_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";
-
-    var incidentTableJoinTaskTable = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,decode(INC.INCIDENT_ASSOCIATION_TYPE,1,'Child',0,'Master',null,'Standalone',INC.INCIDENT_ASSOCIATION_TYPE) as RELATIONSHIP_TYPE,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,tas.ASSIGNEE_GROUP as TASK_ASSIGNEE_GROUP,tas.ASSIGNEE as TASK_ASSIGNEE,tas.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";
-
+    /**
+     * Description
+     * @method startOverConversationWithContext
+     * @param {} response
+     * @param {} sync
+     * @return response
+     */
     this.startOverConversationWithContext = function (response, sync) {
 
         if (response != null && response.entities != null && response.entities[0] != null && response.entities[0].entity == 'startoverchat') {
@@ -34,59 +33,73 @@ module.exports = function () {
 
     }
     // show child incidents for intent 1
+    /**
+     * Description
+     * @method showChildIncidentsWithContext
+     * @param {} response
+     * @param {} sync
+     * @param {} conversationId
+     * @return response
+     */
     this.showChildIncidentsWithContext = function (response, sync, conversationId) {
 
         if (response != null && response.context.cxt_show_incident_details != null && response.context.cxt_show_incident_details == true && response.context.cxt_incident_number != null && response.context.cxt_incident_number != -1 && response.context.cxt_is_master_incident != null && response.context.cxt_is_master_incident) {
             console.log("\nshowChildIncidentsWithContext\n");
-            //var childsql = "Select " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and inc.ORIGINAL_INCIDENT_NUMBER  = '" + correctIncidentNumberFormat(response.context.cxt_incident_number) + "'";
-            var childsql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and inc.ORIGINAL_INCIDENT_NUMBER  = '" + correctIncidentNumberFormat(response.context.cxt_incident_number) + "'";
-            console.log("query from context variable =>" + childsql);
-            //var childoutput = executeQuerySync(childsql);
+            var incidentNumber = correctIncidentNumberFormat(response.context.cxt_incident_number);
             var connection = getOracleDBConnectionRemedy(sync);
-            var childoutput = getOracleQueryResult(connection, childsql, sync);
-            doRelease(connection);
-            var outputText = '';
-            response = showChildIncidents(childoutput.rows, outputText, response, conversationId);
-            /* if (response.output!= null) {
-                 response.output.text = outputText;
-             }*/
-            response = resetEveryThing(response);
-
+            if (connection) {
+                childoutput = getChildIncidentForMaster_SqlHandler(incidentNumber, sync, connection);
+                var outputText = '';
+                response = showChildIncidents(childoutput.rows, outputText, response, conversationId);
+                response = resetEveryThing(response);
+            }
         }
         return response;
     }
 
+    /**
+     * Description
+     * @method showParentIncidentDetailsWithContext
+     * @param {} response
+     * @param {} sync
+     * @return response
+     */
     this.showParentIncidentDetailsWithContext = function (response, sync) {
 
         // show incident details intent 1 :: showing child of master
         if (response != null && response.context.cxt_show_incident_details != null && response.context.cxt_show_incident_details == true && response.context.cxt_parent_incident_number != null && response.context.cxt_parent_incident_number != -1 && response.context.cxt_is_master_incident != null && !response.context.cxt_is_master_incident) {
             console.log("\nshowParentIncidentDetailsWithContext\n");
-            var childsql = "Select " + incidentTableJoinTaskTable + " from " + incidentTableName + " join " + taskTable + " tas on inc.incident_number = tas.ROOTREQUESTID where inc.STATUS in (0,1,2,3) and inc.INCIDENT_NUMBER  = '" + correctIncidentNumberFormat(response.context.cxt_parent_incident_number) + "'";
-            console.log("query from context variable =>" + childsql);
-            //var childoutput = executeQuerySync(childsql);
+            var incidentNumber = correctIncidentNumberFormat(response.context.cxt_parent_incident_number);
             var connection = getOracleDBConnectionRemedy(sync);
-            var childoutput = getOracleQueryResult(connection, childsql, sync);
-            doRelease(connection);
-            var outputText = '';
-            console.log("childoutput.rows.length=>" + childoutput.rows.length);
-            if (childoutput.rows.length == 0) {
-
-                var sql = "SELECT " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and inc.INCIDENT_NUMBER  = '" + correctIncidentNumberFormat(response.context.cxt_parent_incident_number) + "'";
-                // "(SELECT * FROM (SELECT incident_number, DETAILED_DESCRIPTION, work_log_type, TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (WORK_LOG_DATE + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as WORK_LOG_DATE FROM ARADMIN.HPD_WORKLOG where incident_number = '" + incidentNumber + "' ORDER BY work_log_date desc) WHERE rownum = 1) B on A.incident_number = B.incident_number";
-                console.log("query without task=>" + sql);
-                var connection = getOracleDBConnectionRemedy(sync);
-                childoutput = getOracleQueryResult(connection, sql, sync);
+            if (connection) {
+                var childoutput = getParentIncidentDetails_SqlHandler(incidentNumber, sync, connection);
+                var outputText = '';
                 console.log("childoutput.rows.length=>" + childoutput.rows.length);
+                if (childoutput.rows.length == 0) {
+                    childoutput = getIncidentDataOnIncidentNumber_SqlHandler(incidentNumber, sync, connection);
+                    console.log("childoutput.rows.length=>" + childoutput.rows.length);
+                }
                 doRelease(connection);
+                response = showParentIncidentDetails(childoutput.rows, outputText, response);
+                response = resetEveryThing(response);
+
+            } else {
+                response.output.text = "Sorry i could not connect to remedy at the moment, try again later.";
             }
 
-            response = showParentIncidentDetails(childoutput.rows, outputText, response);
-            response = resetEveryThing(response);
 
         }
         return response;
     }
 
+    /**
+     * Description
+     * @method showMasterIncidentForRegionWithContext
+     * @param {} response
+     * @param {} sync
+     * @param {} conversationId
+     * @return response
+     */
     this.showMasterIncidentForRegionWithContext = function (response, sync, conversationId) {
 
         // intent 2 :: Master Incident
@@ -94,11 +107,10 @@ module.exports = function () {
         if (response != null && response.context.cxt_region_show_master_incident) {
             console.log("\nshowMasterIncidentForRegionWithContext\n");
             console.log("response.context.cxt_region_name =>" + response.context.cxt_region_name);
-            var regionLookupQuery = "Select * from region_lookup where (LOWER(full_name) = '" + response.context.cxt_region_name.toLowerCase() + "' OR LOWER(abbreviation) = '" + response.context.cxt_region_name.toLowerCase() + "')";
-            console.log("region lookup query for customer intent. =>" + regionLookupQuery);
-            var lookupResult = executeQuerySync(regionLookupQuery);
+            var lookupResult = regionLookUp_SqlHandler(response.context.cxt_region_name);
+
             var regionFullName = '';
-            if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows.length > 0) {
+            if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows != null && lookupResult.data.rows.length > 0) {
 
                 if (lookupResult.data.rows.length == 1) {
                     regionFullName = "'" + lookupResult.data.rows[0].full_name.toLowerCase() + "'";
@@ -116,34 +128,39 @@ module.exports = function () {
                 }
                 //customerRegion = lookupResult.data.rows[0].full_name;
             } else {
-                regionFullName = response.context.cxt_region_name;
+                regionFullName = "'" + response.context.cxt_region_name + "'";
             }
 
             console.log("response.context.cxt_child_incident_count_for_region=>" + response.context.cxt_child_incident_count_for_region);
             // if no master found with child association list all masters that are found for the region.
             if (response.context.cxt_child_incident_count_for_region == 0) {
-                var childsql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3)";
-                childsql += " AND inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-                childsql += " AND LOWER(inc.region) IN (" + regionFullName + ")";
-                console.log("query to get Master Incident from context variable =>" + childsql);
-                //masterIncidentsDetailsResult = executeQuerySync(childsql);
                 var connection = getOracleDBConnectionRemedy(sync);
-                var masterIncidentsDetailsResult = getOracleQueryResult(connection, childsql, sync);
-                doRelease(connection);
-                outputText = DisplyDetailsForMasterIncidents(masterIncidentsDetailsResult.rows, outputText, response, conversationId);
+                if (connection) {
+                    var masterIncidentsDetailsResult = getMasterIncidentsWithNoChildAssociation_SqlHandler(regionFullName, sync, connection);
+                    if (masterIncidentsDetailsResult != null) {
+                        outputText = DisplyDetailsForMasterIncidents(masterIncidentsDetailsResult.rows, outputText, response, conversationId);
+                    }
+
+                } else {
+                    outputText = "Sorry i could not connect to remedy, please try again later.";
+                }
+
+
 
             } else {
-                //var childsql = "Select count(inc.INCIDENT_NUMBER) as COUNT ,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER AS PARENT_INCIDENT_NUMBER,inc.HPD_CI AS SITE_NAME,inc.DESCRIPTION AS SUMMARY,inc.REGION from " + incidentTableName + " inner join " + incidentTableName_2 + " on ( inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3)) AND LOWER(inc.REGION) = '" + customerRegion+ "' group by (inc.STATUS,inc.ORIGINAL_INCIDENT_NUMBER,inc.HPD_CI,inc.DESCRIPTION,inc.REGION,inc.INCIDENT_NUMBER) order by COUNT desc";
-                var masterSql = "Select distinct inc.INCIDENT_NUMBER,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,inc.ORIGINAL_INCIDENT_NUMBER AS PARENT_INCIDENT_NUMBER,inc.HPD_CI AS SITE_NAME,inc.DESCRIPTION AS SUMMARY,inc.REGION from " + incidentTableName + " inner join " + incidentTableName_2 + " on ( inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3)) ";
-                masterSql += " AND inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-                masterSql += " AND LOWER(inc.REGION) IN (" + regionFullName + ")";
-                console.log("query to get Master Incident from with child associations context variable =>" + masterSql);
-                //var masterIncidentsDetailsResult = executeQuerySync(childsql);
+
                 var connection = getOracleDBConnectionRemedy(sync);
-                var masterIncidentsDetailsResult = getOracleQueryResult(connection, masterSql, sync);
-                doRelease(connection);
-                console.log("masterIncidentsDetailsResult.length=>" + masterIncidentsDetailsResult.rows.length);
-                outputText = showMasterIncidentsForRegion(masterIncidentsDetailsResult.rows, outputText, response, conversationId);
+                if (connection) {
+                    var masterIncidentsDetailsResult = getMasterIncidentsWithChildAssociation_SqlHandler(regionFullName, sync, connection);
+                    if (masterIncidentsDetailsResult != null) {
+                        console.log("masterIncidentsDetailsResult.length=>" + masterIncidentsDetailsResult.rows.length);
+                        outputText = showMasterIncidentsForRegion(masterIncidentsDetailsResult.rows, outputText, response, conversationId);
+                    }
+
+                } else {
+                    outputText = "Sorry i could not connect to remedy, please try again later.";
+                }
+
             }
 
             if (response.output != null) {
@@ -159,6 +176,14 @@ module.exports = function () {
     }
     // intent 2 :: isolated fault
     // site name or node name flow
+    /**
+     * Description
+     * @method regionIntentIsolatedFaultFlowWithContext
+     * @param {} response
+     * @param {} sync
+     * @param {} conversationId
+     * @return response
+     */
     this.regionIntentIsolatedFaultFlowWithContext = function (response, sync, conversationId) {
 
         var outputText = '';
@@ -166,16 +191,12 @@ module.exports = function () {
 
             console.log("\nregionIntentIsolatedFaultFlowWithContext\n");
             if (response.context.cxt_region_full_name != null) {
-                var listOfSitesQuery = "SELECT distinct HPD_CI as SITE_NAME FROM " + incidentTableName + " WHERE LOWER(region) IN (" + response.context.cxt_region_full_name + ") AND STATUS in (0,1,2,3) ";
-                listOfSitesQuery += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-                console.log("listOfSitesQuery =>" + listOfSitesQuery);
+
                 var connection = getOracleDBConnectionRemedy(sync);
-                var listOfSitesOutput = getOracleQueryResult(connection, listOfSitesQuery, sync);
-                doRelease(connection);
-                console.log("listOfSitesOutput.rows.length =>" + listOfSitesOutput.rows.length);
+                var listOfSitesOutput = getListOfSiteNamesBasedOnRegion_SqlHandler(response.context.cxt_region_full_name,sync,connection);
                 var inOperator = "(";
                 if (listOfSitesOutput != null && listOfSitesOutput.rows.length > 0) {
-
+                    console.log("listOfSitesOutput.rows.length =>" + listOfSitesOutput.rows.length);
                     outputText = "<b>Please pick the site name for region " + response.context.cxt_region_name + " from list below. </b><br/><b>If you want to search based on location click <a href='#' id='no' onclick='copyToTypingArea(this);' title='Click here to paste text in typing area' >No</a></b>";
                     outputText += "<table class='w-90'><tr><td><ul>";
                     var columnCount = 0;
@@ -209,8 +230,8 @@ module.exports = function () {
                     inOperator += ")";
 
                     outputText += "</ul></td></tr></td></table>";
-                    var locationSql = "SELECT DISTINCT LOCATION_NAME from name_repo.NMG_CHATBOT_MV WHERE CI_NAME IN " + inOperator + " and LOWER(LOCATION_NAME) != 'unknown' and LOWER(LOCATION_NAME) not like 'estimated%' order by LOCATION_NAME ";
-                    response.context.cxt_location_list_region_fault_flow_query = locationSql;
+                    //var locationSql = "SELECT DISTINCT LOCATION_NAME from name_repo.NMG_CHATBOT_MV WHERE CI_NAME IN " + inOperator + " and LOWER(LOCATION_NAME) != 'unknown' and LOWER(LOCATION_NAME) not like 'estimated%' order by LOCATION_NAME ";
+                    response.context.cxt_location_list_region_fault_flow_query = getLocationsForSiteNames_SqlHandler(inOperator, response);
                 }
                 response.context.cxt_region_full_name = null;
             }
@@ -235,14 +256,9 @@ module.exports = function () {
              * from the list.
              */
             var siteName = response.context.cxt_site_name_region_flow;
-            var incidentSql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where HPD_CI = '" + siteName + "' and status in (0,1,2,3)";
-            incidentSql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-            console.log(incidentSql);
-            //var incidentOutput = executeQuerySync(incidentSql);
             var connection = getOracleDBConnectionRemedy(sync);
-            var incidentOutput = getOracleQueryResult(connection, incidentSql, sync);
-            doRelease(connection);
-
+            var inOperator = null;
+            var incidentOutput = getIncidentsForIsolatedFaultWithSiteNames_SqlHandler(siteName,inOperator,sync,connection);
             outputText = showIncidentsForRegionBasedOnLocation(incidentOutput.rows, outputText, response, conversationId);
             response = resetEveryThing(response);
             if (response.output != null) {
@@ -256,15 +272,13 @@ module.exports = function () {
             console.log("\nregionIntentIsolatedFaultFlowWithContext :: isolated fault location name flow\n");
             response.context.cxt_location_name_region_flow_found = true;
             console.log("response.context.cxt_location_name_region_flow_found =>" + response.context.cxt_location_name_region_flow_found);
-            var locationSql = "SELECT * from name_repo.NMG_CHATBOT_MV WHERE LOWER(LOCATION_NAME) = '" + response.context.cxt_location_name_region_flow.toLowerCase() + "'";
-            console.log("location query from context variable =>" + locationSql);
+           
             var connection = getOracleDBConnection(sync);
-            var locationOutput = getOracleQueryResult(connection, locationSql, sync);
-            doRelease(connection);
-            //var locationOutput = executeQuerySync(locationSql);
+            var locationOutput = getListOfSiteNamesOnLocationName_SqlHandler(response,sync,connection);
             var inOperator = "(";
-            console.log("site names on location =>" + locationOutput.rows.length);
+           
             if (locationOutput.rows.length > 0) {
+                console.log("site names on location =>" + locationOutput.rows.length);
                 for (i = 0; i < locationOutput.rows.length; i++) {
 
                     inOperator += "'" + locationOutput.rows[i].CI_NAME + "'";
@@ -277,14 +291,9 @@ module.exports = function () {
                 }
                 inOperator += ")";
                 console.log(inOperator);
-                var incidentSql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where HPD_CI in " + inOperator + " and status in (0,1,2,3)";
-                incidentSql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-                console.log(incidentSql);
-                //var incidentOutput = executeQuerySync(incidentSql);
                 var connection = getOracleDBConnectionRemedy(sync);
-                var incidentOutput = getOracleQueryResult(connection, incidentSql, sync);
-                doRelease(connection);
-
+                var siteName = null;
+                var incidentOutput = getIncidentsForIsolatedFaultWithSiteNames_SqlHandler(siteName,inOperator,sync,connection);
                 outputText = showIncidentsForRegionBasedOnLocation(incidentOutput.rows, outputText, response, conversationId);
                 response = resetEveryThing(response);
             } else {
@@ -299,26 +308,24 @@ module.exports = function () {
             }
 
         }
-
-        /* if (response.context.cxt_region_flow_search_for_location) {
-             console.log("response.output.text=>"+response.output.text);
-            //[isolated_fault_location_list_here]
-         }*/
-        //console.log
         return response;
     }
 
+    /**
+     * Description
+     * @method technologyTypeFlowWithContext
+     * @param {} response
+     * @param {} sync
+     * @param {} conversationId
+     * @return response
+     */
     this.technologyTypeFlowWithContext = function (response, sync, conversationId) {
 
         // transmission location flow : intent
         if (response != null && response.context.cxt_location_name_trx_flow != null) {
             console.log("\ntechnologyTypeFlowWithContext\n");
-            console.log("response.context.cxt_location_name_trx_flow =>" + response.context.cxt_location_name_trx_flow);
-            var locationSql = "SELECT * from name_repo.NMG_CHATBOT_MV WHERE LOWER(LOCATION_NAME) = '" + response.context.cxt_location_name_trx_flow.toLowerCase() + "'  and ROWNUM < 1000";
-            console.log("location query from context variable for trx =>" + locationSql);
-            //var locationOutput = executeQuerySync(locationSql);
-            var connection = getOracleDBConnection(sync);
-            var locationOutput = getOracleQueryResult(connection, locationSql, sync);
+            var connection = getOracleDBConnectionRemedy(sync);
+            var locationOutput = getListOfSiteNamesOnLocationName_SqlHandler(response,sync,connection);
 
             var inOperator = "(";
             if (locationOutput != null && locationOutput.rows.length > 0) {
@@ -336,17 +343,10 @@ module.exports = function () {
 
                 }
                 inOperator += ")";
-                var incidentSql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.HPD_CI in " + inOperator + " and INC.INCIDENT_ASSOCIATION_TYPE = 0 AND inc.status in (0,1,2,3)";
-                incidentSql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-                if (response.context.cxt_tx_name != null) {
-                    incidentSql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) = '" + response.context.cxt_tx_name.toLowerCase() + "' ";
-                }
-                console.log("incident sql =>" + incidentSql);
+              
 
                 var connection = getOracleDBConnectionRemedy(sync);
-                var incidentOutput = getOracleQueryResult(connection, incidentSql, sync);
-                doRelease(connection);
-
+                var incidentOutput = getListOfIncidentsonTechType_SqlHandler(response,sync,connection);//getOracleQueryResult(connection, incidentSql, sync);
                 var outputText = '';
                 outputText = showIncidentsForTransmissionFailureOnLocation(incidentOutput.rows, response, conversationId);
                 if (response.output != null) {
@@ -366,6 +366,13 @@ module.exports = function () {
 
     }
 
+    /**
+     * Description
+     * @method corporateCustomerFlowWithContext
+     * @param {} response
+     * @param {} sync
+     * @return response
+     */
     this.corporateCustomerFlowWithContext = function (response, sync) {
 
         if (response != null && response.context.cxt_matched_customer_count > 1 && response.entities != null && response.entities[0] != null && response.entities[0].entity == 'yes' && response.context.cxt_customer_drill_down_region == null) {
@@ -518,16 +525,9 @@ module.exports = function () {
 
             var nodeOutput = null;
             if (nodeId != null) {
-                var nodeSql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.STATUS in (0,1,2,3) and (inc.HPD_CI in('NODE" + nodeId + "'";
-                for (j = 1; j < output.rows.length; j++) {
-                    nodeId = output.rows[j].NID;
-                    nodeSql += " , 'NODE" + nodeId + "'"
-                }
-                nodeSql += "))";
-                console.log(nodeSql);
                 var connection = getOracleDBConnectionRemedy(sync);
-                nodeOutput = getOracleQueryResult(connection, nodeSql, sync);
-                doRelease(connection);
+                nodeOutput = getListOfIncidentsForCustomerNodes_SqlHandler(nodeId,output,sync,connection);
+                
             }
 
             if (nodeOutput != null && nodeOutput.rows.length == 0) {
@@ -590,20 +590,30 @@ module.exports = function () {
 
     }
 
+    /**
+     * Description
+     * @method userLoginWithContext
+     * @param {} response
+     * @param {} sync
+     * @return response
+     */
     this.userLoginWithContext = function (response, sync) {
 
         if (response != null && response.context != null && !response.context.cxt_user_logged_in && response.context.cxt_verify_user) {
+
             console.log("verifying user credentials");
 
             if (response.context.cxt_user_email != null && response.context.cxt_user_password != null) {
 
-                var loginOutPut = userLogin(response);
-
-                if (loginOutPut.data.rows.length != 0) {
+                var loginOutPut = userLogin_SqlHandler(response);
+                //console.log("loginOutPut=>"+JSON.stringify(loginOutPut));
+                if (loginOutPut != null && loginOutPut.data != null && loginOutPut.data.rows && loginOutPut.data.rows.length != 0) {
                     console.log("credentials verified");
                     response.context.cxt_user_logged_in = true;
+                    response.context.cxt_userId = loginOutPut.data.rows[0].id;
                     response.context.cxt_user_full_name = loginOutPut.data.rows[0].first_name + " " + loginOutPut.data.rows[0].last_name;
                     userFullName = response.context.cxt_user_full_name;
+
 
                 } else {
                     console.log("credentials not verified");
@@ -611,109 +621,17 @@ module.exports = function () {
                     response.context.cxt_user_password = null;
                     response.context.cxt_user_logged_in = false;
                     response.context.cxt_verify_user = false;
+                    response.context.cxt_userId = -1;
+                    response.context.cxt_user_full_name = null;
                 }
 
                 response = getWatsonResponse(response, sync, "yes");
+
             }
 
 
         }
         return response;
     }
-
-    function getWatsonResponse(data, sync, inputText) {
-        var inputJSON = {};
-        if (inputText != null) {
-            inputJSON = { "text": inputText };
-        }
-        var payload = {
-            workspace_id: process.env.WORKSPACE_ID,
-            context: data.context || {},
-            input: inputJSON
-        };
-        // Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
-        var response = null;
-        try {
-            response = sync.await(conversation.message(payload, sync.defer()));
-
-        } catch (err) {
-            //TODO Handle error
-            console.log("error=>" + JSON.stringify(err.message));
-        }
-        return response;
-
-
-    }
-
-    this.createEntityValue = function (val, entityName) {
-        createEntityValue(val, entityName);
-    }
-
-    function createEntityValue(val, entityName) {
-        val = S(val).replaceAll('corporate', '').s;
-        val = S(val).replaceAll('customer', '').s;
-
-        if (val != '' && val.toLowerCase() != 'region' && val.toLowerCase() != 'corporate' && val.toLowerCase() != 'customer' && val.toLowerCase() != 'yes' && val.toLowerCase() != 'no') {
-            var params = {
-                workspace_id: workspaceId,
-                entity: entityName,
-                value: val
-            };
-
-
-
-            conversation.createValue(params, function (err, response) {
-                if (err) {
-                    console.error(err);
-                } else {
-                    console.log(JSON.stringify(response, null, 2));
-                    /*if (val != null || val != '') {
-                        var res = val.split(" ");
-                        for (i = 0; i < res.length; i++) {
-                            if (res[i].length > 1 && entityName != '2g-sites') {
-                                //createSynonymsForValue(val, entityName, res[i]);   will not create synonyms for any entity
-                            }
-                        }
-                    }*/
-                }
-
-            });
-
-        }
-
-
-    }
-
-    function createSynonymsForValue(val, entityName, synonymVal) {
-        var params = {
-            workspace_id: workspaceId,
-            entity: entityName,
-            value: val,
-            synonym: synonymVal
-        };
-        conversation.createSynonym(params, function (err, response) {
-            if (err) {
-                console.error(err);
-            } else {
-                console.log(JSON.stringify(response, null, 2));
-            }
-
-        });
-    }
-
-    function getEntityValue() {
-
-        conversation.getValue(params, function (err, resp) {
-            if (err) {
-                console.error(err);
-            } else {
-                console.log(JSON.stringify(resp, null, 2));
-            }
-
-        });
-
-
-    }
-
 
 };

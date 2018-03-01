@@ -17,6 +17,7 @@ var uuid = require('uuid');
 var sync = require('synchronize');
 var Regex = require('regex');
 var express = require('express'); // app server
+var session = require('express-session');
 var S = require('string');
 var dbConfig = require('./db/dbconfig.js');
 var bodyParser = require('body-parser'); // parser for post requests
@@ -24,7 +25,6 @@ var Conversation = require('watson-developer-cloud/conversation/v1'); // watson 
 var DiscoveryV1 = require('watson-developer-cloud/discovery/v1');
 var striptags = require('striptags');
 /* Variables Declaration */
-var NodeSession = require('node-session');
 var app = express();
 var connection = null;
 var inputText = null;
@@ -61,9 +61,9 @@ app.use(bodyParser.urlencoded({
 app.use(session({
 	secret: 'vodacom-chatbot-ZCAAMVI',
 	resave: false,
-	saveUninitialized: true
-  }));
-
+	saveUninitialized: true,
+	cookie: {}
+}))
 
 require('./utility/intenthandler.js')();
 require('./utility/orchestration.js')();
@@ -106,6 +106,13 @@ app.post('/api/message', function (req, res) {
 		inputText = req.body.input.text;
 		//console.log("Input provided is => "+req.body.input.text);
 	}
+	var hour = 3600000; // in milisecond   60000 (one minute) , session time set to 1 hour for now.
+	req.session.cookie.expires = new Date(Date.now() + hour)
+	req.session.cookie.maxAge = hour
+
+	if (!req.session.response) {
+		req.session.response = {}
+	}
 
 	try {
 
@@ -117,6 +124,8 @@ app.post('/api/message', function (req, res) {
 			if (response.context.conversation_id != null) {
 				conversationId = response.context.conversation_id;
 			}
+
+
 
 			console.log("Response JSON =>" + JSON.stringify(response));
 
@@ -163,21 +172,24 @@ app.post('/api/message', function (req, res) {
 					response.output.text = data.output.text;
 				}
 				response = data;
-				
+
 				/*Escalation Intent Handling.*/
-				//if (response != null && response.intents != null && response.intents.length != 0)
-				//	response.output.text = handleEscalationIntent(response, inputText, response.output.text, await, defer, discovery);
+				if (response != null && response.intents != null && response.intents.length != 0)
+					var data = handleEscalationIntent(response, inputText, response.output.text, await, defer, discovery);
+				if (data != null && data.output != null) {
+					response.output.text = data.output.text;
+				}
+				response = data;
 
 
+				if (response != null && response.output != null && response.output.text != null && response.output.text[0] != null) {
 
-				if (response != null && response.output != null && response.output.text != null && response.output.text[0] != null ) {
-					
-					if (response.context != null && response.context.cxt_show_location_list_tech_type &&  response.context.cxt_location_list_trx_failure_query != null && response.context.cxt_location_name_trx_flow == null){
+					if (response.context != null && response.context.cxt_show_location_list_tech_type && response.context.cxt_location_list_trx_failure_query != null && response.context.cxt_location_name_trx_flow == null) {
 						response.output.text[0] = updateSuggestedLocationsInMessage(response.output.text[0], response.context.cxt_location_list_trx_failure_query, sync);
 					}
-					
+
 				}
-				if (response.context.cxt_region_flow_search_for_location && response.context.cxt_location_list_region_fault_flow_query != null) {
+				if (response != null && response.context != null && response.context.cxt_region_flow_search_for_location && response.context.cxt_location_list_region_fault_flow_query != null) {
 					console.log("replace isolated_fault_location_list");
 					//[isolated_fault_location_list_here]
 					response.output.text[0] = updateSuggestedLocationsInMessage(response.output.text[0], response.context.cxt_location_list_region_fault_flow_query, sync);
@@ -203,9 +215,23 @@ app.post('/api/message', function (req, res) {
 				console.log("Context is null");
 			}
 
-			response = userLoginWithContext(response, sync);
+			if (req.session.response.context == null) {
+				response = userLoginWithContext(response, sync);
+			}
 
-			console.log("before sending back response=>"+JSON.stringify(response));
+
+			if (response != null && response.context != null && response.context.cxt_user_logged_in) {
+				req.session.response = response;
+			}
+
+			if (response != null && response.context != null && !response.context.cxt_user_logged_in && req.session.response.context != null) {
+				console.log("restoring user details from session");
+
+
+				response = req.session.response;
+			}
+
+			//console.log("req.session.response=>"+JSON.stringify(response));
 			return res.json(updateMessage(payload, response));
 
 		});  // fiber ends here
@@ -217,12 +243,26 @@ app.post('/api/message', function (req, res) {
 	}
 });
 
+/**
+ * Description
+ * @method sendMessageToWatson
+ * @param {} app
+ * @param {} request
+ * @param {} sync
+ * @return res
+ */
 function sendMessageToWatson(app, request, sync) {
 
 	var res = sync.await(app.post('/api/message', request, sync.defer()));
 	return res;
 }
 // Send the input to the conversation service
+/**
+ * Description
+ * @method getWatsonResponse
+ * @param {} payload
+ * @return response
+ */
 function getWatsonResponse(payload) {
 
 	// Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
@@ -296,6 +336,16 @@ app.get('/rating', function (req, res) {
 	}*/
 })
 
+/**
+ * Description
+ * @method recordFeedback
+ * @param {} response
+ * @param {} feedbackReason
+ * @param {} feedback_value
+ * @param {} feedbackReasonText
+ * @param {} ratingValue
+ * @return 
+ */
 function recordFeedback(response, feedbackReason, feedback_value, feedbackReasonText, ratingValue) {
 	//console.log("recordFeedback=>feedbackReason =>" + JSON.stringify(feedbackReason));
 	var conversationId = lastResponse.context.conversation_id;
@@ -328,6 +378,12 @@ function recordFeedback(response, feedbackReason, feedback_value, feedbackReason
 
 }
 
+/**
+ * Description
+ * @method recordResponseTime
+ * @param {} response
+ * @return 
+ */
 function recordResponseTime(response) {
 	console.log("recordResponseTime");
 	var intent = null;
@@ -376,9 +432,10 @@ function recordResponseTime(response) {
 
 /**
  * Updates the response text using the intent confidence
- * @param  {Object} input The request to the Conversation service
- * @param  {Object} response The response from the Conversation service
- * @return {Object}          The response with the updated message
+ * @method updateMessage
+ * @param {Object} input The request to the Conversation service
+ * @param {Object} response The response from the Conversation service
+ * @return response
  */
 function updateMessage(input, response) {
 	//var responseText = null;

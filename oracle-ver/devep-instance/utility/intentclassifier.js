@@ -1,9 +1,22 @@
+/**
+ * Description
+ * @method exports
+ * @return 
+ * intentClassifier is used to classify intents when input triggers multiple entities for instance customer name sometime contains region as part of name so watson
+ * returns region and corporate customer entities, intent classifier then decides after executing certain question asked by the user.
+ * This validator will contain all functions that will decide which intent / entity is actually detected when multiple entities are returned
+ * This validator will decide on the basis of context variables and entities to return the valid intent hit by user.
+ */
 module.exports = function () {
-    /**
-     * This validator will contain all functions that will decide which intent / entity is actually detected when multiple entities are returned
-     * This validator will decide on the basis of context variables and entities to return the valid intent hit by user.
-     */
+    
+    var S = require('string');
 
+    /**
+     * Description
+     * @method sitesIntentClassifier
+     * @param {} data
+     * @return returnArray
+     */
     this.sitesIntentClassifier = function (data) {
         var isValidSitesIntent = true;
         var siteNodePattern = false;
@@ -25,13 +38,18 @@ module.exports = function () {
                 }
 
             }
-            /*for (i = 0; i < data.intents.length; i++) {
+            if (data != null && data.intents != null){
 
-                if (data.intents[i] != null && data.intents[i].intent == 'incident') {
-                    isValidSitesIntent = false;
+                for (i = 0; i < data.intents.length; i++) {
+
+                    if (data.intents[i] != null && data.intents[i].intent == 'escalation') {
+                        isValidSitesIntent = false;
+                    }
+    
                 }
 
-            }*/
+            }
+            
         }
         if (data.context != null && data.context.cxt_ci_flow_site_name == null) {
             isValidSitesIntent = false;
@@ -45,6 +63,12 @@ module.exports = function () {
 
     }
 
+    /**
+     * Description
+     * @method techTypeIntentClassifier
+     * @param {} data
+     * @return returnArray
+     */
     this.techTypeIntentClassifier = function (data) {
         var returnArray = [];
         var validTransmissionFailureIntent = false;
@@ -81,11 +105,28 @@ module.exports = function () {
         if (validTransmissionFailureIntent) {
             console.log("\nvalidTransmissionFailureIntent=>" + validTransmissionFailureIntent);
         }
+        if (data != null && data.intents != null){
+
+            for (i = 0; i < data.intents.length; i++) {
+
+                if (data.intents[i] != null && data.intents[i].intent == 'escalation') {
+                    validTransmissionFailureIntent = false;
+                }
+
+            }
+
+        }
         returnArray['validTransmissionFailureIntent'] = validTransmissionFailureIntent;
         returnArray['tier_cause_search_term'] = tier_cause_search_term;
         return returnArray;
     }
 
+    /**
+     * Description
+     * @method regionIntentClassifier
+     * @param {} data
+     * @return returnArray
+     */
     this.regionIntentClassifier = function (data) {
 
         var returnArray = [];
@@ -153,12 +194,30 @@ module.exports = function () {
             console.log("isValidRegionIntentCase=>" + isValidRegionIntentCase);
             console.log("regionName=>" + regionName);
         }
+        if (data != null && data.intents != null){
+
+            for (i = 0; i < data.intents.length; i++) {
+
+                if (data.intents[i] != null && data.intents[i].intent == 'escalation') {
+                    isValidRegionIntentCase = false;
+                }
+
+            }
+
+        }
         returnArray['regionName'] = regionName;
         returnArray['isValidRegionIntentCase'] = isValidRegionIntentCase;
         return returnArray;
 
     }
 
+    /**
+     * Description
+     * @method incidentIntentClassifier
+     * @param {} data
+     * @param {} inputText
+     * @return returnArray
+     */
     this.incidentIntentClassifier = function (data, inputText) {
         var returnArray = [];
         var isValidIncidentIntent = false;
@@ -214,6 +273,18 @@ module.exports = function () {
                 isValidIncidentIntent = false;
             }
         }
+        
+        if (data != null && data.intents != null){
+
+            for (i = 0; i < data.intents.length; i++) {
+
+                if (data.intents[i] != null && data.intents[i].intent == 'escalation') {
+                    isValidIncidentIntent = false;
+                }
+
+            }
+
+        }
         if (isValidIncidentIntent) {
             console.log("isValidIncidentIntent=>" + isValidIncidentIntent);
             console.log("incidentNumber=>" + JSON.stringify(incidentNumber));
@@ -224,6 +295,12 @@ module.exports = function () {
         return returnArray;
     }
 
+    /**
+     * Description
+     * @method customerIntentClassifier
+     * @param {} data
+     * @return returnArray
+     */
     this.customerIntentClassifier = function (data) {
         var returnArray = [];
         var isValidCustomerIntent = false;
@@ -240,9 +317,10 @@ module.exports = function () {
                         isValidCustomerIntent = true;
                         customerList[i] = data.entities[i].value;
                         inOperatorCustomer += "'" + customerList[i] + "'";
-                        if (i < data.entities.length - 1) {
+                        if (i < data.entities.length - 1 && data.entities.length > 1) {
                             inOperatorCustomer += ",";
                         }
+                        inOperatorCustomer = S(inOperatorCustomer).chompRight(',').s;
                         customerCount++;
                     }
 
@@ -270,6 +348,18 @@ module.exports = function () {
         if (isValidCustomerIntent) {
             console.log("isValidCustomerIntent=>" + isValidCustomerIntent);
             console.log("customerCount=>" + JSON.stringify(customerCount));
+        }
+
+        if (data != null && data.intents != null){
+
+            for (i = 0; i < data.intents.length; i++) {
+
+                if (data.intents[i] != null && data.intents[i].intent == 'escalation') {
+                    isValidCustomerIntent = false;
+                }
+
+            }
+
         }
 
         returnArray['isValidCustomerIntent'] = isValidCustomerIntent;

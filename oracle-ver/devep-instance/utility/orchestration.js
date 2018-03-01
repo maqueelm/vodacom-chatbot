@@ -1,23 +1,26 @@
+/**
+ * Description
+ * @method exports
+ * @return 
+ */
 module.exports = function () {
-	var workspaceId = process.env.WORKSPACE_ID;
-	var Conversation = require("watson-developer-cloud/conversation/v1");
-	var conversation = new Conversation({
-		username: process.env.CONVERSATION_USERNAME,
-		password: process.env.CONVERSATION_PASSWORD,
-		version_date: '2017-05-26'
-	});
 	var excelbuilder = require('msexcel-builder');
 	var S = require('string');
 	require('./stringhandler')();
-	var excelGenerationRecordCountLimit = 10;
-	var incidentTableName = "ARADMIN.HPD_HELP_DESK inc";
-	var incidentTableName_2 = "ARADMIN.HPD_HELP_DESK inc_2";
-
-	var incidentTableFieldsWithAlias = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,decode(INC.INCIDENT_ASSOCIATION_TYPE,1,'Child',0,'Master',null,'Standalone',INC.INCIDENT_ASSOCIATION_TYPE) as RELATIONSHIP_TYPE,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,inc.ASSIGNED_GROUP,inc.RESOLUTION_CATEGORY_TIER_2 as RESOLUTION_CATEGORY_TIER_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";
-
-	var incidentTableJoinTaskTable = "inc.INCIDENT_NUMBER,inc.ORIGINAL_INCIDENT_NUMBER as PARENT_INCIDENT_NUMBER,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTSTARTTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_START_TIME,TO_CHAR(TO_DATE('1970-01-01', 'YYYY-MM-DD') + (inc.SPE_FLD_ALARMEVENTENDTIME + 7200) / 86400,'DD/MON/YYYY HH24:MI:SS') as INCIDENT_EVENT_END_TIME,inc.SPE_FLD_ACTUALIMPACT as IMPACT,inc.REGION,inc.HPD_CI as SITE_NAME,inc.DESCRIPTION as SUMMARY,decode(inc.STATUS,0,'New',1,'Assigned',2,'In Progress',3,'Pending',4,'Resolved',5,'Closed',6,'Cancelled',inc.STATUS) as INC_STATUS,decode(INC.INCIDENT_ASSOCIATION_TYPE,1,'Child',0,'Master',null,'Standalone',INC.INCIDENT_ASSOCIATION_TYPE) as RELATIONSHIP_TYPE,inc.ASSIGNED_GROUP as ASSIGNED_GROUP,inc.ASSIGNEE,tas.ASSIGNEE_GROUP as TASK_ASSIGNEE_GROUP,tas.ASSIGNEE as TASK_ASSIGNEE,tas.TASK_ID as task_id,inc.RESOLUTION_CATEGORY_TIER_2 as resolution_category_tier_2,inc.RESOLUTION_CATEGORY_TIER_3 as RESOLUTION_CATEGORY_TIER_3,inc.GENERIC_CATEGORIZATION_TIER_1 as CAUSE_TIER_1,inc.GENERIC_CATEGORIZATION_TIER_2 as CAUSE_TIER_2 ";
+	require('./sqlhandler')();
+    require('./watsonentityhandler')();
+	var excelGenerationRecordCountLimit = process.env.GENERATE_EXCEL_IF_RECORDS_GREATER_THAN;
 
 	// Orchestration Layer Methods 
+	/**
+	 * Description
+	 * @method orchestrateBotResponseTextForSiteName
+	 * @param {} dbQueryResult
+	 * @param {} outputText
+	 * @param {} response
+	 * @param {} childCount
+	 * @return outputText
+	 */
 	this.orchestrateBotResponseTextForSiteName = function (dbQueryResult, outputText, response, childCount) {
 		console.log("orchestrateBotResponseTextForSiteName = >Length of rows =>" + dbQueryResult.length);
 		//console.log ("Output =>" + outputText);
@@ -72,6 +75,14 @@ module.exports = function () {
 
 	}
 
+	/**
+	 * Description
+	 * @method showParentIncidentDetails
+	 * @param {} dbQueryResult
+	 * @param {} outputText
+	 * @param {} response
+	 * @return response
+	 */
 	this.showParentIncidentDetails = function (dbQueryResult, outputText, response) {
 		var outputText_new = '';
 		if (dbQueryResult.length > 0) {
@@ -139,6 +150,15 @@ module.exports = function () {
 
 	}
 
+	/**
+	 * Description
+	 * @method showChildIncidents
+	 * @param {} dbQueryResult
+	 * @param {} outputText
+	 * @param {} response
+	 * @param {} conversationId
+	 * @return response
+	 */
 	this.showChildIncidents = function (dbQueryResult, outputText, response, conversationId) {
 		var outputText_new = '';
 		var excelFileName = "childIncidentList_" + conversationId + "_" + new Date().getTime() + ".xlsx";
@@ -179,6 +199,16 @@ module.exports = function () {
 		return response;
 	}
 
+	/**
+	 * Description
+	 * @method orchestrateBotResponseTextForIncident
+	 * @param {} dbQueryResult
+	 * @param {} outputText
+	 * @param {} response
+	 * @param {} childCount
+	 * @param {} sync
+	 * @return response
+	 */
 	this.orchestrateBotResponseTextForIncident = function (dbQueryResult, outputText, response, childCount, sync) {
 		console.log("orchestrateBotResponseTextForIncident = >Length of rows =>" + dbQueryResult.length);
 		//console.log ("dbQueryResult =>" + JSON.stringify(dbQueryResult));
@@ -264,33 +294,25 @@ module.exports = function () {
 		return response;
 	}
 
+	/**
+	 * Description
+	 * @method orchestrateBotResponseTextForRegion
+	 * @param {} data
+	 * @param {} sync
+	 * @return data
+	 */
 	this.orchestrateBotResponseTextForRegion = function (data, sync) {
 		console.log("orchestrateBotResponseTextForRegion");
 		var masterIncidentCount = 0;
 		var childIncidentCount = 0;
-		var childIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as CHILDCOUNT from " + incidentTableName + " where (inc.INCIDENT_ASSOCIATION_TYPE = 1 and  inc.STATUS in (0,1,2,3))";
-		childIncidentCountsql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-		childIncidentCountsql += " and LOWER(inc.region) IN (" + data.context.cxt_region_full_name + " )";
-		console.log("childIncidentCountsql =>" + childIncidentCountsql);
 		var connection = getOracleDBConnectionRemedy(sync);
-		var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql, sync);
-		doRelease(connection);
-		//console.log("masterIncidentCountResult=>"+JSON.stringify(masterIncidentCountResult));
-		childIncidentCount = childIncidentCountResult.rows[0].CHILDCOUNT;
+		childIncidentCount = getChildIncidentCountForRegion_SqlHandler(data,sync,connection);
+			
 		data.context.cxt_child_incident_count_for_region = childIncidentCount;
 		// association type 1 = child , 0 = master, null = standalone
-		var masterIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as MASTERCOUNT from " + incidentTableName + " inner join " + incidentTableName_2 + "  on (inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3))";
-		masterIncidentCountsql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-		masterIncidentCountsql += " and LOWER(inc.region) IN (" + data.context.cxt_region_full_name + " ) ";
-		//var masterIncidentCountsql = "Select count(distinct inc.ORIGINAL_INCIDENT_NUMBER) as MASTERCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER and inc_2.INCIDENT_ASSOCIATION_TYPE  = 0) where LOWER(inc.region) = '" + regionName_2.toLowerCase() + "' and inc_2.STATUS not in (5,6) ";//and inc_2.STATUS not in (5,6)
-		//var childIncidentCountsql = "Select count(*) as CHILDCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where LOWER(inc.region) like '%" + regionName_2.toLowerCase() + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
-		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
 		var connection = getOracleDBConnectionRemedy(sync);
-		var masterIncidentCountResult = getOracleQueryResult(connection, masterIncidentCountsql, sync);
-		//console.log("childIncidentCountResult=>"+JSON.stringify(childIncidentCountResult));
-		doRelease(connection);
-		//var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
-		masterIncidentCount = masterIncidentCountResult.rows[0].MASTERCOUNT;
+		masterIncidentCount = getMasterIncidentCountForRegion_SqlHandler(data,sync,connection);
+
 		var totalCount = masterIncidentCount + childIncidentCount;
 		if (totalCount > 0) {
 			var is_are = "is";
@@ -327,6 +349,14 @@ module.exports = function () {
 
 	}
 
+	/**
+	 * Description
+	 * @method updateSuggestedLocationsInMessage
+	 * @param {} messageText
+	 * @param {} locationListQuery
+	 * @param {} sync
+	 * @return messageText
+	 */
 	this.updateSuggestedLocationsInMessage = function (messageText, locationListQuery, sync) {
 
 		var locationsText = '';
@@ -369,12 +399,20 @@ module.exports = function () {
 		return messageText;
 	}
 
+	/**
+	 * Description
+	 * @method showIncidentsForSiteName
+	 * @param {} dbQueryResult
+	 * @param {} outputText
+	 * @param {} response
+	 * @param {} conversationId
+	 * @return response
+	 */
 	this.showIncidentsForSiteName = function (dbQueryResult, outputText, response, conversationId) {
 		var outputText_new;
 		var excelFileName = "incidentListBasedOnSite_" + conversationId + "_" + new Date().getTime() + ".xlsx";
 		if (dbQueryResult.length == 0) {
 			outputText_new = "<b>Sorry no incident found against the given site name " + response.context.cxt_site_name_region_flow + ".</b><br/>";
-			//outputText += updateSuggestedLocationsInMessage(outputText_new, data.context.cxt_region_name);
 			outputText_new = addFeedbackButton(outputText_new);
 			if (response.output.text[0] != null) {
 				var temp = response.output.text[0];
@@ -427,6 +465,15 @@ module.exports = function () {
 		return response;
 	}
 
+	/**
+	 * Description
+	 * @method DisplyDetailsForMasterIncidents
+	 * @param {} dbQueryResult
+	 * @param {} outputText
+	 * @param {} response
+	 * @param {} conversationId
+	 * @return MemberExpression
+	 */
 	this.DisplyDetailsForMasterIncidents = function (dbQueryResult, outputText, response, conversationId) {
 		var outputText_new = "";
 
@@ -474,6 +521,15 @@ module.exports = function () {
 		return response.output.text;
 	}
 
+	/**
+	 * Description
+	 * @method showMasterIncidentsForRegion
+	 * @param {} dbQueryResult
+	 * @param {} outputText
+	 * @param {} response
+	 * @param {} conversationId
+	 * @return MemberExpression
+	 */
 	this.showMasterIncidentsForRegion = function (dbQueryResult, outputText, response, conversationId) {
 		var outputText_new = "";
 
@@ -521,6 +577,15 @@ module.exports = function () {
 		return response.output.text;
 	}
 
+	/**
+	 * Description
+	 * @method showIncidentsForRegionBasedOnLocation
+	 * @param {} dbQueryResult
+	 * @param {} outputText
+	 * @param {} response
+	 * @param {} conversationId
+	 * @return MemberExpression
+	 */
 	this.showIncidentsForRegionBasedOnLocation = function (dbQueryResult, outputText, response, conversationId) {
 		var outputText_new = "";
 		var excelFileName = "incidentListInRegionBasedOnLocation_" + conversationId + "_" + new Date().getTime() + ".xlsx";
@@ -567,6 +632,14 @@ module.exports = function () {
 		return response.output.text;
 	}
 
+	/**
+	 * Description
+	 * @method showIncidentsForTransmissionFailureOnLocation
+	 * @param {} dbQueryResult
+	 * @param {} response
+	 * @param {} conversationId
+	 * @return MemberExpression
+	 */
 	this.showIncidentsForTransmissionFailureOnLocation = function (dbQueryResult, response, conversationId) {
 
 		var outputText_new = '';
@@ -611,6 +684,14 @@ module.exports = function () {
 
 	}
 
+	/**
+	 * Description
+	 * @method orchestrateBotResponseTextForCustomer
+	 * @param {} customerCount
+	 * @param {} data
+	 * @param {} regionName
+	 * @return data
+	 */
 	this.orchestrateBotResponseTextForCustomer = function (customerCount, data, regionName) {
 		outputText = data.output.text;
 		data.context.cxt_matched_customer_count = customerCount;
@@ -640,6 +721,13 @@ module.exports = function () {
 
 	}
 
+	/**
+	 * Description
+	 * @method orchestrateBotResponseTextForTransmissionFailures
+	 * @param {} response
+	 * @param {} sync
+	 * @return response
+	 */
 	this.orchestrateBotResponseTextForTransmissionFailures = function (response, sync) {
 
 		console.log("orchestrateBotResponseTextForTransmissionFailures");
@@ -647,50 +735,12 @@ module.exports = function () {
 		var childIncidentCount = 0;
 		var outputText_new = '';
 		//if (dbQueryResult != null) {
-
-		var cause_tier_1 = response.context.cxt_tx_name;
-		var childIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as CHILDCOUNT from " + incidentTableName + " where (inc.INCIDENT_ASSOCIATION_TYPE = 1 and  inc.STATUS in (0,1,2,3)) ";
-		childIncidentCountsql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-		//if (cause_tier_1.toLowerCase() == 'transmission') {
-		//	childIncidentCountsql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx')";
-		//} else {
-		childIncidentCountsql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) = '" + cause_tier_1.toLowerCase() + "'";
-		//}
-
-		if (response.context.cxt_tech_type_region_full_name != null) {
-			childIncidentCountsql += " and LOWER(inc.REGION) IN (" + response.context.cxt_tech_type_region_full_name + ")";
-		}
-
-		console.log("childIncidentCountsql =>" + childIncidentCountsql);
 		var connection = getOracleDBConnectionRemedy(sync);
-		var childIncidentCountResult = getOracleQueryResult(connection, childIncidentCountsql, sync);
-		doRelease(connection);
-		//console.log("masterIncidentCountResult=>"+JSON.stringify(masterIncidentCountResult));
-		childIncidentCount = childIncidentCountResult.rows[0].CHILDCOUNT;
+		var childIncidentCount = getChildIncidentCountForTechType_SqlHandler(response,sync,connection);
 		response.context.cxt_child_incident_count_for_region = childIncidentCount;
-		// association type 1 = child , 0 = master, null = standalone
-		//LOWER(inc.GENERIC_CATEGORIZATION_TIER_1) in('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx');
-		var masterIncidentCountsql = "Select count(distinct inc.INCIDENT_NUMBER) as MASTERCOUNT from " + incidentTableName + " inner join " + incidentTableName_2 + "  on (inc_2.ORIGINAL_INCIDENT_NUMBER = inc.INCIDENT_NUMBER) where (inc.INCIDENT_ASSOCIATION_TYPE  = 0 and inc.STATUS in (0,1,2,3))";
-		masterIncidentCountsql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
-		//if (cause_tier_1.toLowerCase() == 'transmission') {
-		//	masterIncidentCountsql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) in ('transport tx','transport','transport cdn nsa 3rd party','transport cdn 3rd party','transport cdn','transport tx 3rd party','transport_tx') ";
-		//} else {
-		masterIncidentCountsql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) = '" + cause_tier_1.toLowerCase() + "' ";
-		//}
-
-		if (response.context.cxt_tech_type_region_full_name != null) {
-			masterIncidentCountsql += " and LOWER(inc.REGION) IN (" + response.context.cxt_tech_type_region_full_name + ")";
-		}
-
-		//var masterIncidentCountsql = "Select count(distinct inc.ORIGINAL_INCIDENT_NUMBER) as MASTERCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER and inc_2.INCIDENT_ASSOCIATION_TYPE  = 0) where LOWER(inc.region) = '" + regionName_2.toLowerCase() + "' and inc_2.STATUS not in (5,6) ";//and inc_2.STATUS not in (5,6)
-		//var childIncidentCountsql = "Select count(*) as CHILDCOUNT from "+incidentTableName+" inner join "+incidentTableName_2+" on (inc.ORIGINAL_INCIDENT_NUMBER = inc_2.INCIDENT_NUMBER) where LOWER(inc.region) like '%" + regionName_2.toLowerCase() + "%' and inc.ORIGINAL_INCIDENT_NUMBER is not null and inc.STATUS not in (5,6) and inc_2.STATUS not in (5,6)";
-		console.log("masterIncidentCountsql =>" + masterIncidentCountsql);
+		
 		var connection = getOracleDBConnectionRemedy(sync);
-		var masterIncidentCountResult = getOracleQueryResult(connection, masterIncidentCountsql, sync);
-		//console.log("childIncidentCountResult=>"+JSON.stringify(childIncidentCountResult));
-		doRelease(connection);
-		//var childIncidentCountResult = executeQuerySync(childIncidentCountsql);
-		masterIncidentCount = masterIncidentCountResult.rows[0].MASTERCOUNT;
+		masterIncidentCount = getMasterIncidentCountForTechType_SqlHandler(response,sync,connection);
 		var totalCount = masterIncidentCount + childIncidentCount;
 		response.context.cxt_tx_found_incident_count = totalCount;
 		var is_are = "is";
@@ -732,12 +782,26 @@ module.exports = function () {
 		return response;
 	}
 
+	/**
+	 * Description
+	 * @method addFeedbackButton
+	 * @param {} outputText
+	 * @return outputText
+	 */
 	this.addFeedbackButton = function (outputText) {
 		outputText += "<br/><b>Please vote on feedback provided.</b>&nbsp;&nbsp;<img src='img/thumbsup-blue.png' class='feedback-img' title='good' onClick='openWindow(1);' />&nbsp;&nbsp;<img src='img/thumbsdown-red.png' class='feedback-img' title='bad' onClick='LogThumbsDown();' /><br/>";
 		//outputText += "<div class='rating'><span onclick='javascript:rate(5);' title='5'>☆</span><span onclick='javascript:rate(4);' title='4'>☆</span><span onclick='javascript:rate(3);' title='3'>☆</span><span onclick='javascript:rate(2);' title='2'>☆</span><span onclick='javascript:rate(1);' title='1'>☆</span></div><br/>";
 		return outputText;
 	}
 
+	/**
+	 * Description
+	 * @method buildExcelSheet
+	 * @param {} excelSheetName
+	 * @param {} dbQueryResult
+	 * @param {} noOfColumns
+	 * @return 
+	 */
 	this.buildExcelSheet = function buildExcelSheet(excelSheetName, dbQueryResult, noOfColumns) {
 
 		// Create a new workbook file in current working-path 
@@ -789,43 +853,5 @@ module.exports = function () {
 
 
 	}
-
-	function getWatsonResponse(data, sync, inputText) {
-		var conversation = new Conversation({
-			// If unspecified here, the CONVERSATION_USERNAME and CONVERSATION_PASSWORD env properties will be checked
-			// After that, the SDK will fall back to the bluemix-provided VCAP_SERVICES environment property
-			username: process.env.CONVERSATION_USERNAME,
-			password: process.env.CONVERSATION_PASSWORD,
-			url: 'https://gateway.watsonplatform.net/conversation/api',
-			version_date: '2016-10-21',
-			version: 'v1'
-		});
-		var inputJSON = {};
-		if (inputText != null) {
-			inputJSON = { "text": inputText };
-		}
-		var payload = {
-			workspace_id: process.env.WORKSPACE_ID,
-			context: data.context || {},
-			input: inputJSON
-		};
-		//console.log("payload=>"+JSON.stringify(payload.input));
-		// Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
-		var response = null;
-		try {
-			response = sync.await(conversation.message(payload, sync.defer()));
-
-		} catch (err) {
-			//TODO Handle error
-			console.log("error=>" + JSON.stringify(err.message));
-		}
-		//console.log("getWatsonResponse=>"+JSON.stringify(response));
-		return response;
-
-
-	}
-
-
-
 
 };
