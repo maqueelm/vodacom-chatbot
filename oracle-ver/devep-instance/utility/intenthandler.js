@@ -98,12 +98,12 @@ module.exports = function () {
 
                 data.context.cxt_tx_name = tier_cause_search_term;
 
-                var regionFullName = '';
+                var regionFullName = data.context.cxt_tech_type_region;
 
                 if (data.context.cxt_tech_type_region != null) {
 
                     var lookupResult = regionLookUp_SqlHandler(data.context.cxt_tech_type_region);
-
+                    regionFullName = '';
                     if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows != null && lookupResult.data.rows.length > 0) {
                         if (lookupResult.data.rows.length == 1) {
                             regionFullName = "'" + lookupResult.data.rows[0].full_name.toLowerCase() + "'";
@@ -386,11 +386,11 @@ module.exports = function () {
     this.handleRegionIntent = function (data, inputText, outputText, sync) {
         var returnArray = regionIntentClassifier(data);
         var isValidRegionIntentCase = returnArray['isValidRegionIntentCase'];
-        var regionName = returnArray['regionName'];;
+        var regionName = returnArray['regionName'];
 
         if (isValidRegionIntentCase) {
             var fullName = "";
-            var regionFullName = '';
+            var regionFullName = regionName;
             var lookupResult = regionLookUp_SqlHandler(regionName);
             if (lookupResult != null && lookupResult.data != null && lookupResult.data.rows != null && lookupResult.data.rows.length > 0) {
                 if (lookupResult.data.rows.length == 1) {

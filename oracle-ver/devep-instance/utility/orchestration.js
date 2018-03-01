@@ -366,7 +366,7 @@ module.exports = function () {
 		var connection = getOracleDBConnection(sync);
 		var locationList = getOracleQueryResult(connection, locationListQuery, sync);
 		if (locationList != null && locationList.rows.length > 0) {
-			locationsText = "<b>Select the location name.</b> <br/><table class='w-90'>";
+			locationsText = "<b>Select the location name.</b> <br/><table class='w-100'>";
 			locationsText += "<tr><td><ul>";
 			var columnCount = 0;
 			for (i = 0; i < locationList.rows.length; i++) {

@@ -99,7 +99,7 @@ module.exports = function () {
         locatoinForFailureSql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
 
         locatoinForFailureSql += " and LOWER(inc.CLOSURE_PRODUCT_CATEGORY_TIER1) = '" + data.context.cxt_tx_name.toLowerCase() + "'";
-        if (regionFullName != '') {
+        if (regionFullName != '' && regionFullName != null) {
             locatoinForFailureSql += " and LOWER(inc.region) IN (" + regionFullName.toLowerCase() + ")";
         }
         console.log("locatoinForFailureSql=>" + locatoinForFailureSql);
@@ -355,7 +355,7 @@ module.exports = function () {
      * @param {} connection
      * @return incidentOutput
      */
-    this.getListOfIncidentsonTechType_SqlHandler = function (response, sync, connection) {
+    this.getListOfIncidentsonTechType_SqlHandler = function (inOperator,response, sync, connection) {
         var incidentSql = "Select " + incidentTableFieldsWithAlias + " from " + incidentTableName + " where inc.HPD_CI in " + inOperator + " and INC.INCIDENT_ASSOCIATION_TYPE = 0 AND inc.status in (0,1,2,3)";
         incidentSql += " and inc.SPE_FLD_ALARMEVENTSTARTTIME > to_char((SELECT ( SYSDATE - DATE '1970-01-01' ) * 86400 AS unixepoch FROM   DUAL) - 604800)";
         if (response.context.cxt_tx_name != null) {

@@ -324,7 +324,7 @@ module.exports = function () {
         // transmission location flow : intent
         if (response != null && response.context.cxt_location_name_trx_flow != null) {
             console.log("\ntechnologyTypeFlowWithContext\n");
-            var connection = getOracleDBConnectionRemedy(sync);
+            var connection = getOracleDBConnection(sync);
             var locationOutput = getListOfSiteNamesOnLocationName_SqlHandler(response,sync,connection);
 
             var inOperator = "(";
@@ -346,7 +346,7 @@ module.exports = function () {
               
 
                 var connection = getOracleDBConnectionRemedy(sync);
-                var incidentOutput = getListOfIncidentsonTechType_SqlHandler(response,sync,connection);//getOracleQueryResult(connection, incidentSql, sync);
+                var incidentOutput = getListOfIncidentsonTechType_SqlHandler(inOperator,response,sync,connection);//getOracleQueryResult(connection, incidentSql, sync);
                 var outputText = '';
                 outputText = showIncidentsForTransmissionFailureOnLocation(incidentOutput.rows, response, conversationId);
                 if (response.output != null) {
@@ -606,7 +606,7 @@ module.exports = function () {
             if (response.context.cxt_user_email != null && response.context.cxt_user_password != null) {
 
                 var loginOutPut = userLogin_SqlHandler(response);
-                //console.log("loginOutPut=>"+JSON.stringify(loginOutPut));
+                console.log("loginOutPut=>"+JSON.stringify(loginOutPut));
                 if (loginOutPut != null && loginOutPut.data != null && loginOutPut.data.rows && loginOutPut.data.rows.length != 0) {
                     console.log("credentials verified");
                     response.context.cxt_user_logged_in = true;

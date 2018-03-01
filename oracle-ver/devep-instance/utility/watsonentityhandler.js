@@ -6,6 +6,7 @@ module.exports = function () {
         password: process.env.CONVERSATION_PASSWORD,
         version_date: '2017-05-26'
     });
+    var S = require('string');
     /**
      * Description
      * @method createEntityValue
@@ -31,12 +32,12 @@ module.exports = function () {
                     console.error(err);
                 } else {
                     console.log(JSON.stringify(resp, null, 2));
-                   /* var res = val.split(" ");
-                    for (i = 0; i < res.length; i++) {
-                        if (res[i].length > 1 && entityName != '2g-sites') {
-                            //createSynonymsForValue(val, entityName, res[i]); will not create synonyms for any entity.
-                        }
-                    }*/
+                    /* var res = val.split(" ");
+                     for (i = 0; i < res.length; i++) {
+                         if (res[i].length > 1 && entityName != '2g-sites') {
+                             //createSynonymsForValue(val, entityName, res[i]); will not create synonyms for any entity.
+                         }
+                     }*/
                 }
 
             });
@@ -101,7 +102,44 @@ module.exports = function () {
 
 
     }
+    // Send the input to the conversation service
+    /**
+     * Description
+     * @method getWatsonResponse
+     * @param {} payload
+     * @return response
+     */
+    this.getResponse = function (payload, sync) {
 
-    
+        // Get a response to a user's input. conversation.message method takes user input in payload and returns watson response on that input in data object.
+        var response = null;
+        try {
+            response = sync.await(conversation.message(payload, sync.defer()));
+
+        } catch (err) {
+            //TODO Handle error
+            console.log("error=>" + JSON.stringify(err.message));
+        }
+        return response;
+
+
+    }
+
+    /**
+ * Description
+ * @method sendMessageToWatson
+ * @param {} app
+ * @param {} request
+ * @param {} sync
+ * @return res
+ */
+    this.sendMessageToWatson = function (app, request, sync) {
+
+        var res = sync.await(app.post('/api/message', request, sync.defer()));
+        return res;
+    }
+
+
+
 
 };
